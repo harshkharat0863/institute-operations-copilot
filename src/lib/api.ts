@@ -1,0 +1,600 @@
+import {
+  ActionItem,
+  AttendanceRecord,
+  Batch,
+  CopilotAskResponse,
+  Course,
+  EMI,
+  RedTeamTestResult,
+  Student,
+  TimetableRunResponse,
+  Trainer,
+  User,
+  UserRole,
+  Weekday,
+} from '../types';
+import { decodeJwt, generateMockJwt } from './jwt';
+import {
+  addDraftActions,
+  approveAction,
+  bulkApproveActions,
+  getActions,
+  rejectAction,
+  updateActionMessage,
+} from './mock/actions';
+import { getAuditLogs, getQueryLogs, recordAuditLog, recordQueryLog } from './mock/audit';
+import { processCopilotQuery } from './mock/copilot';
+import {
+  BATCHES,
+  COURSES,
+  DEMO_USERS,
+  generateInitialAttendance,
+  generateInitialEMIs,
+  generateInitialStudents,
+  TRAINERS,
+} from './mock/data';
+import { runRedTeamSuite } from './mock/redteam';
+import { generateTimetableFresh, getTimetable, replanTimetable } from './mock/timetable';
+
+// State caches for mock environment
+let mockStudentsStore: Student[] = generateInitialStudents();
+let mockBatchesStore: Batch[] = JSON.parse(JSON.stringify(BATCHES));
+let mockEmisStore: EMI[] = generateInitialEMIs(mockStudentsStore);
+let mockAttendanceStore: AttendanceRecord[] = generateInitialAttendance(mockStudentsStore);
+
+/**
+ * Determine if mock mode is active.
+ * Checks localStorage first (runtime toggle), then Vite/Next environment variables.
+ */
+export function isMockMode(): boolean {
+  if (typeof window !== 'undefined') {
+    const override = localStorage.getItem('copilot_use_mock');
+    if (override !== null) {
+      return override === 'true';
+    }
+  }
+
+  // Check Vite env
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    if (import.meta.env.VITE_USE_MOCK !== undefined) {
+      return import.meta.env.VITE_USE_MOCK !== 'false';
+    }
+  }
+
+  // Fallback default: true (Mock first per spec)
+  return true;
+}
+
+export function setMockMode(enabled: boolean): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('copilot_use_mock', enabled ? 'true' : 'false');
+    window.dispatchEvent(new Event('mock_mode_changed'));
+  }
+}
+
+export function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const customUrl = localStorage.getItem('copilot_api_url');
+    if (customUrl) return customUrl;
+  }
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  return 'http://localhost:8000';
+}
+
+export function setApiBaseUrl(url: string): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('copilot_api_url', url);
+  }
+}
+
+/**
+ * Global response handler for 401 & 403 status codes.
+ */
+function handleAuthStatus(status: number) {
+  if (typeof window === 'undefined') return;
+  if (status === 401) {
+    localStorage.removeItem('copilot_jwt_token');
+    window.dispatchEvent(new CustomEvent('auth_unauthorized'));
+  } else if (status === 403) {
+    window.dispatchEvent(new CustomEvent('auth_forbidden'));
+  }
+}
+
+/**
+ * Generic fetch wrapper for FastAPI backend
+ */
+async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('copilot_jwt_token') : null;
+  const baseUrl = getApiBaseUrl().replace(/\/$/, '');
+  const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> || {}),
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      handleAuthStatus(res.status);
+      throw new Error(res.status === 401 ? 'Unauthorized session' : 'Forbidden for role');
+    }
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(errBody.detail || `API error ${res.status}: ${res.statusText}`);
+    }
+
+    return await res.json();
+  } catch (err: any) {
+    console.error(`API fetch failed on ${endpoint}:`, err);
+    throw err;
+  }
+}
+
+// -------------------------------------------------------------
+// UNIFIED API METHODS (SWITCHING AUTOMATICALLY BETWEEN MOCK & REAL)
+// -------------------------------------------------------------
+
+export const api = {
+  // 1. Authentication
+  async login(email: string, roleHint?: UserRole): Promise<{ token: string; user: User }> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 200)); // simulate network latency
+      // Find matching demo user or construct based on role
+      let user: User | undefined;
+      const normalized = email.toLowerCase().trim();
+
+      if (normalized.includes('owner') || roleHint === 'owner') user = DEMO_USERS.owner;
+      else if (normalized.includes('counselor') || roleHint === 'counselor') user = DEMO_USERS.counselor;
+      else if (normalized.includes('trainer') || roleHint === 'trainer') user = DEMO_USERS.trainer;
+      else if (normalized.includes('accounts') || roleHint === 'accounts') user = DEMO_USERS.accounts;
+      else user = DEMO_USERS.owner;
+
+      const token = generateMockJwt(user);
+      localStorage.setItem('copilot_jwt_token', token);
+      recordAuditLog({
+        user_name: user.name,
+        role: user.role,
+        action: 'login',
+        target: 'Web Console',
+        details: `Successful authentication as ${user.role}`,
+        ip_address: '127.0.0.1 (Local)',
+        status: 'success',
+      });
+      return { token, user };
+    }
+
+    const data = await apiFetch<{ token: string; user: User }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+    localStorage.setItem('copilot_jwt_token', data.token);
+    return data;
+  },
+
+  // 2. Students CRUD
+  async getStudents(params?: { batch_id?: string; status?: string }): Promise<Student[]> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 120));
+      let filtered = [...mockStudentsStore];
+      if (params?.batch_id && params.batch_id !== 'all') {
+        filtered = filtered.filter(s => s.batch_id === params.batch_id);
+      }
+      if (params?.status && params.status !== 'all') {
+        filtered = filtered.filter(s => s.status === params.status);
+      }
+      return filtered;
+    }
+    const query = new URLSearchParams(params as any).toString();
+    return apiFetch<Student[]>(`/students${query ? `?${query}` : ''}`);
+  },
+
+  async addStudent(studentData: Omit<Student, 'id' | 'attendance_rate' | 'missed_classes_last_30d'>): Promise<Student> {
+    if (isMockMode()) {
+      const newStudent: Student = {
+        ...studentData,
+        id: `std_${Date.now()}`,
+        attendance_rate: 100,
+        missed_classes_last_30d: 0,
+      };
+      mockStudentsStore = [newStudent, ...mockStudentsStore];
+      recordAuditLog({
+        user_name: 'Current User',
+        role: 'counselor',
+        action: 'student_created',
+        target: newStudent.name,
+        details: `Enrolled in ${newStudent.batch_name}`,
+        ip_address: '127.0.0.1',
+        status: 'success',
+      });
+      return newStudent;
+    }
+    return apiFetch<Student>('/students', {
+      method: 'POST',
+      body: JSON.stringify(studentData),
+    });
+  },
+
+  async updateStudent(id: string, updates: Partial<Student>): Promise<Student> {
+    if (isMockMode()) {
+      const idx = mockStudentsStore.findIndex(s => s.id === id);
+      if (idx === -1) throw new Error('Student not found');
+      mockStudentsStore[idx] = { ...mockStudentsStore[idx], ...updates };
+      recordAuditLog({
+        user_name: 'Current User',
+        role: 'owner',
+        action: 'student_updated',
+        target: mockStudentsStore[idx].name,
+        details: `Updated details: ${Object.keys(updates).join(', ')}`,
+        ip_address: '127.0.0.1',
+        status: 'success',
+      });
+      return mockStudentsStore[idx];
+    }
+    return apiFetch<Student>(`/students/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  },
+
+  // 3. Batches
+  async getBatches(): Promise<Batch[]> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 100));
+      return mockBatchesStore;
+    }
+    return apiFetch<Batch[]>('/batches');
+  },
+
+  async addBatch(batchData: Omit<Batch, 'id' | 'enrolled_count'>): Promise<Batch> {
+    if (isMockMode()) {
+      const newBatch: Batch = {
+        ...batchData,
+        id: `b_${Date.now()}`,
+        enrolled_count: 0,
+      };
+      mockBatchesStore = [newBatch, ...mockBatchesStore];
+      recordAuditLog({
+        user_name: 'Current User',
+        role: 'owner',
+        action: 'batch_created',
+        target: newBatch.name,
+        details: `Trainer: ${newBatch.trainer_name}, Mode: ${newBatch.mode}`,
+        ip_address: '127.0.0.1',
+        status: 'success',
+      });
+      return newBatch;
+    }
+    return apiFetch<Batch>('/batches', {
+      method: 'POST',
+      body: JSON.stringify(batchData),
+    });
+  },
+
+  // 4. Courses & Trainers
+  async getCourses(): Promise<Course[]> {
+    if (isMockMode()) return COURSES;
+    return apiFetch<Course[]>('/courses');
+  },
+
+  async getTrainers(): Promise<Trainer[]> {
+    if (isMockMode()) return TRAINERS;
+    return apiFetch<Trainer[]>('/trainers');
+  },
+
+  // 5. Fees & EMIs (Owner/Accounts only)
+  async getEmis(status?: 'due' | 'paid' | 'missed' | 'all'): Promise<EMI[]> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 120));
+      if (!status || status === 'all') return mockEmisStore;
+      return mockEmisStore.filter(e => e.status === status);
+    }
+    const query = status && status !== 'all' ? `?status=${status}` : '';
+    return apiFetch<EMI[]>(`/fees/emis${query}`);
+  },
+
+  async markEmiPaid(emiId: string): Promise<EMI> {
+    if (isMockMode()) {
+      const emi = mockEmisStore.find(e => e.id === emiId);
+      if (!emi) throw new Error('EMI record not found');
+      emi.status = 'paid';
+      emi.paid_date = new Date().toISOString().split('T')[0];
+      emi.payment_method = 'UPI / Payment Gateway (Marked)';
+      recordAuditLog({
+        user_name: 'Current Accounts User',
+        role: 'accounts',
+        action: 'fee_marked_paid',
+        target: `EMI #${emi.id}`,
+        details: `₹${emi.amount} collected for ${emi.student_name}`,
+        ip_address: '127.0.0.1',
+        status: 'success',
+      });
+      return emi;
+    }
+    return apiFetch<EMI>(`/fees/emis/${emiId}/pay`, { method: 'POST' });
+  },
+
+  // 6. Attendance (Classroom vs Online)
+  async getAttendanceRecords(type?: 'classroom' | 'online' | 'all'): Promise<AttendanceRecord[]> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 100));
+      if (!type || type === 'all') return mockAttendanceStore;
+      return mockAttendanceStore.filter(a => a.type === type);
+    }
+    const query = type && type !== 'all' ? `?type=${type}` : '';
+    return apiFetch<AttendanceRecord[]>(`/attendance${query}`);
+  },
+
+  async checkInClassroom(data: { student_id: string; batch_id: string; status: 'present' | 'late' }): Promise<AttendanceRecord> {
+    if (isMockMode()) {
+      const student = mockStudentsStore.find(s => s.id === data.student_id);
+      const batch = mockBatchesStore.find(b => b.id === data.batch_id);
+      const rec: AttendanceRecord = {
+        id: `att_${Date.now()}`,
+        student_id: data.student_id,
+        student_name: student?.name || 'Student',
+        batch_id: data.batch_id,
+        batch_name: batch?.name || 'Classroom Batch',
+        type: 'classroom',
+        date: new Date().toISOString().split('T')[0],
+        timestamp: new Date().toISOString(),
+        status: data.status,
+        ip_or_location: 'Front Desk Biometric Portal',
+        duration_minutes: 120,
+        verified_by: 'Counselor Station',
+      };
+      mockAttendanceStore = [rec, ...mockAttendanceStore];
+      return rec;
+    }
+    return apiFetch<AttendanceRecord>('/attendance/checkin', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async recordOnlineJoin(data: { student_id: string; batch_id: string; duration_minutes: number }): Promise<AttendanceRecord> {
+    if (isMockMode()) {
+      const student = mockStudentsStore.find(s => s.id === data.student_id);
+      const batch = mockBatchesStore.find(b => b.id === data.batch_id);
+      const rec: AttendanceRecord = {
+        id: `att_${Date.now()}`,
+        student_id: data.student_id,
+        student_name: student?.name || 'Student',
+        batch_id: data.batch_id,
+        batch_name: batch?.name || 'Online Batch',
+        type: 'online',
+        date: new Date().toISOString().split('T')[0],
+        timestamp: new Date().toISOString(),
+        status: 'present',
+        ip_or_location: 'WebRTC / Zoom Bridge Node',
+        duration_minutes: data.duration_minutes,
+        verified_by: 'Virtual Classroom SDK',
+      };
+      mockAttendanceStore = [rec, ...mockAttendanceStore];
+      return rec;
+    }
+    return apiFetch<AttendanceRecord>('/attendance/online-join', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // 7. Copilot Ask
+  async askCopilot(question: string, userRole: UserRole): Promise<CopilotAskResponse> {
+    if (isMockMode()) {
+      // simulate natural LLM thinking time
+      await new Promise(r => setTimeout(r, 380));
+      const res = processCopilotQuery(question, userRole);
+
+      // Record in query log
+      recordQueryLog({
+        question,
+        sql: res.sql,
+        role: userRole,
+        status: res.status,
+        blocked_reason: res.blocked_reason,
+        blocked_layer: res.blocked_layer,
+        row_count: res.row_count,
+        duration_ms: res.duration_ms,
+      });
+
+      return res;
+    }
+    return apiFetch<CopilotAskResponse>('/copilot/ask', {
+      method: 'POST',
+      body: JSON.stringify({ question }),
+    });
+  },
+
+  // 8. Approvals & Actions
+  async getActions(statusFilter?: string): Promise<ActionItem[]> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 120));
+      return getActions(statusFilter);
+    }
+    const query = statusFilter ? `?status=${statusFilter}` : '';
+    return apiFetch<ActionItem[]>(`/actions${query}`);
+  },
+
+  async approveAction(id: string, approverName: string): Promise<ActionItem> {
+    if (isMockMode()) {
+      const res = approveAction(id, approverName);
+      if (!res) throw new Error('Action not found');
+      recordAuditLog({
+        user_name: approverName,
+        role: 'accounts',
+        action: 'approve_reminder',
+        target: `Action #${id}`,
+        details: `Approved notification for student ${res.student_name} (${res.phone_masked})`,
+        ip_address: '127.0.0.1',
+        status: 'success',
+      });
+      return res;
+    }
+    return apiFetch<ActionItem>(`/actions/${id}/approve`, { method: 'POST' });
+  },
+
+  async rejectAction(id: string, rejectorName: string): Promise<ActionItem> {
+    if (isMockMode()) {
+      const res = rejectAction(id, rejectorName);
+      if (!res) throw new Error('Action not found');
+      recordAuditLog({
+        user_name: rejectorName,
+        role: 'counselor',
+        action: 'reject_action',
+        target: `Action #${id}`,
+        details: `Rejected notification for student ${res.student_name}`,
+        ip_address: '127.0.0.1',
+        status: 'warning',
+      });
+      return res;
+    }
+    return apiFetch<ActionItem>(`/actions/${id}/reject`, { method: 'POST' });
+  },
+
+  async updateAction(id: string, message: string): Promise<ActionItem> {
+    if (isMockMode()) {
+      const res = updateActionMessage(id, message);
+      if (!res) throw new Error('Action not found');
+      return res;
+    }
+    return apiFetch<ActionItem>(`/actions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ message }),
+    });
+  },
+
+  async bulkApproveActions(ids: string[], approverName: string): Promise<ActionItem[]> {
+    if (isMockMode()) {
+      const res = bulkApproveActions(ids, approverName);
+      recordAuditLog({
+        user_name: approverName,
+        role: 'owner',
+        action: 'bulk_approve_actions',
+        target: `${ids.length} Reminders`,
+        details: `Approved ${ids.length} WhatsApp notifications dispatched via outbox.`,
+        ip_address: '127.0.0.1',
+        status: 'success',
+      });
+      return res;
+    }
+    return apiFetch<ActionItem[]>('/actions/bulk-approve', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    });
+  },
+
+  async draftRemindersFromCopilot(
+    drafts: Array<{ student_name: string; phone_masked: string; message: string; due_date: string }>,
+    requesterName: string
+  ): Promise<ActionItem[]> {
+    if (isMockMode()) {
+      return addDraftActions(drafts, requesterName);
+    }
+    return apiFetch<ActionItem[]>('/actions/draft-reminders', {
+      method: 'POST',
+      body: JSON.stringify({ drafts, requester: requesterName }),
+    });
+  },
+
+  // 9. Timetable
+  async getTimetable(): Promise<TimetableRunResponse> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 100));
+      return getTimetable();
+    }
+    return apiFetch<TimetableRunResponse>('/timetable/generate', { method: 'POST' });
+  },
+
+  async generateTimetable(): Promise<TimetableRunResponse> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 220));
+      return generateTimetableFresh();
+    }
+    return apiFetch<TimetableRunResponse>('/timetable/generate', { method: 'POST' });
+  },
+
+  async replanTimetable(
+    event: 'trainer_unavailable' | 'batch_added',
+    details: {
+      trainer?: string;
+      trainer_id?: string;
+      day?: Weekday;
+      time_range?: string;
+      batch_name?: string;
+      course_name?: string;
+      room?: string;
+    }
+  ): Promise<TimetableRunResponse> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 250));
+      const res = replanTimetable(event, details);
+      recordAuditLog({
+        user_name: 'Timetable Dispatcher',
+        role: 'owner',
+        action: 'timetable_replan',
+        target: event,
+        details: `Re-planned timetable: ${res.changes?.length || 0} classes adjusted with 0 conflicts.`,
+        ip_address: '127.0.0.1',
+        status: 'success',
+      });
+      return res;
+    }
+    return apiFetch<TimetableRunResponse>('/timetable/replan', {
+      method: 'POST',
+      body: JSON.stringify({ event, details }),
+    });
+  },
+
+  // 10. Audit & Query Log (Owner only)
+  async getAudit(): Promise<any[]> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 90));
+      return getAuditLogs();
+    }
+    return apiFetch<any[]>('/audit');
+  },
+
+  async getQueryLog(): Promise<any[]> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 90));
+      return getQueryLogs();
+    }
+    return apiFetch<any[]>('/query-log');
+  },
+
+  // 11. Red-Team Suite (Owner only)
+  async runRedTeam(): Promise<{
+    total: number;
+    blocked: number;
+    leaked: number;
+    allowed_controls: number;
+    results: RedTeamTestResult[];
+  }> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 650));
+      return runRedTeamSuite();
+    }
+    const results = await apiFetch<RedTeamTestResult[]>('/redteam/run', { method: 'POST' });
+    const blocked = results.filter(r => r.result === 'BLOCKED').length;
+    const leaked = results.filter(r => r.result === 'LEAKED').length;
+    return {
+      total: results.length,
+      blocked,
+      leaked,
+      allowed_controls: results.filter(r => r.result === 'ALLOWED').length,
+      results,
+    };
+  },
+};

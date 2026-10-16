@@ -1,0 +1,6 @@
+{
+  "name": "Institute Operations Copilot",
+  "description": "Admin platform for coaching institutes with AI-powered plain-language data queries, role-based safety views, timetable planning, and approvals queue.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
