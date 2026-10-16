@@ -14,6 +14,8 @@ import {
   Info,
   ChevronRight,
   ChevronLeft,
+  Move,
+  GripVertical,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -45,6 +47,66 @@ export const TimetableView: React.FC = () => {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [viewMode, setViewMode] = useState<'after' | 'before'>('after');
   const [isChangeLogOpen, setIsChangeLogOpen] = useState<boolean>(true);
+  const [draggingSessionId, setDraggingSessionId] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+
+  // Drag and drop reschedule handler
+  const handleDropSession = (targetDay: Weekday, targetSlot: string) => {
+    if (!draggingSessionId || !timetable) return;
+    const session = timetable.sessions.find(s => s.id === draggingSessionId);
+    if (!session) return;
+
+    const times = targetSlot.split(' - ');
+    const newStart = times[0];
+    const newEnd = times[1];
+
+    // Conflict detection: Check if same trainer or same room is already booked in that slot
+    const hasConflict = timetable.sessions.some(
+      s => s.id !== draggingSessionId &&
+           s.weekday === targetDay &&
+           (s.start === newStart || s.trainer_id === session.trainer_id || s.room === session.room)
+    );
+
+    const oldDay = session.weekday;
+    const oldSlot = `${session.start} - ${session.end}`;
+
+    const updatedSessions = timetable.sessions.map(s => {
+      if (s.id === draggingSessionId) {
+        return {
+          ...s,
+          weekday: targetDay,
+          start: newStart,
+          end: newEnd,
+        };
+      }
+      return s;
+    });
+
+    const newChange: TimetableChange = {
+      session: session.batch,
+      session_id: session.id,
+      from_slot: `${oldDay} ${oldSlot} (${session.room})`,
+      to_slot: `${targetDay} ${newStart} - ${newEnd} (${session.room})`,
+      reason: hasConflict
+        ? `⚠️ Rescheduled with potential trainer/room overlap warning.`
+        : `Manually rescheduled to ${targetDay} ${newStart} with 0 conflicts.`,
+    };
+
+    setTimetable({
+      ...timetable,
+      sessions: updatedSessions,
+      changes: [newChange, ...(timetable.changes || [])],
+      conflicts: hasConflict ? timetable.conflicts + 1 : timetable.conflicts,
+    });
+
+    setDraggingSessionId(null);
+    setDragOverKey(null);
+    showToast(
+      `Moved "${session.batch}" to ${targetDay} ${newStart} - ${newEnd}`,
+      hasConflict ? 'warning' : 'success',
+      'Timetable Solver'
+    );
+  };
 
   // Modals
   const [isUnavailableModalOpen, setIsUnavailableModalOpen] = useState<boolean>(false);
@@ -262,31 +324,57 @@ export const TimetableView: React.FC = () => {
                     {/* Day Cells */}
                     {WEEKDAYS.map(day => {
                       const sessions = getSessionsForSlot(day, slot);
+                      const cellKey = `${day}_${slot}`;
+                      const isDragOver = dragOverKey === cellKey;
 
                       return (
                         <div
                           key={day}
-                          className="p-2 border-r border-slate-100 last:border-r-0 space-y-2 bg-slate-50/20"
+                          onDragOver={e => {
+                            e.preventDefault();
+                            setDragOverKey(cellKey);
+                          }}
+                          onDragLeave={() => setDragOverKey(null)}
+                          onDrop={e => {
+                            e.preventDefault();
+                            handleDropSession(day, slot);
+                          }}
+                          className={`p-2 border-r border-slate-100 last:border-r-0 space-y-2 transition-colors ${
+                            isDragOver ? 'bg-indigo-50/70 border-indigo-300 ring-2 ring-indigo-400 ring-inset' : 'bg-slate-50/20'
+                          }`}
                         >
                           {sessions.map(sess => {
                             const isMoved = movedSessionIds.has(sess.id);
+                            const isDragging = draggingSessionId === sess.id;
 
                             return (
                               <div
                                 key={sess.id}
-                                className={`rounded-xl p-2.5 text-xs border transition-all ${sess.color_code || 'bg-slate-50 border-slate-200'} ${
+                                draggable
+                                onDragStart={() => setDraggingSessionId(sess.id)}
+                                onDragEnd={() => setDraggingSessionId(null)}
+                                className={`rounded-xl p-2.5 text-xs border transition-all cursor-grab active:cursor-grabbing select-none ${
+                                  sess.color_code || 'bg-slate-50 border-slate-200'
+                                } ${
+                                  isDragging ? 'opacity-40 scale-95' : ''
+                                } ${
                                   isMoved && viewMode === 'after'
                                     ? 'ring-2 ring-amber-500 shadow-md animate-pulse'
-                                    : 'shadow-2xs'
+                                    : 'shadow-2xs hover:shadow-xs'
                                 }`}
                               >
-                                {isMoved && viewMode === 'after' && (
-                                  <div className="mb-1">
+                                <div className="flex items-center justify-between mb-1">
+                                  {isMoved && viewMode === 'after' ? (
                                     <span className="text-[10px] font-bold text-amber-900 bg-amber-200/70 px-1.5 py-0.5 rounded">
                                       RE-PLANNED
                                     </span>
-                                  </div>
-                                )}
+                                  ) : (
+                                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider">
+                                      {sess.mode}
+                                    </span>
+                                  )}
+                                  <GripVertical className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 shrink-0" />
+                                </div>
 
                                 <div className="font-bold text-slate-900 leading-tight">
                                   {sess.batch}
