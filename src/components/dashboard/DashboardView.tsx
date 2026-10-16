@@ -7,15 +7,17 @@ import {
   ArrowUpRight,
   TrendingUp,
   AlertTriangle,
-  Bot,
-  Calendar,
   Sparkles,
+  DollarSign,
+  Download,
 } from 'lucide-react';
 import {
   LineChart,
   Line,
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -50,6 +52,14 @@ const BATCH_ATTENDANCE_DATA = [
   { batch: 'WebDev', rate: 92, target: 85 },
   { batch: 'DevOps', rate: 85, target: 85 },
   { batch: 'QA Auto', rate: 89, target: 85 },
+];
+
+const FEE_FORECAST_DATA = [
+  { week: 'W1 (Oct 1-7)', collected: 320000, projected: 300000 },
+  { week: 'W2 (Oct 8-14)', collected: 450000, projected: 410000 },
+  { week: 'W3 (Oct 15-21)', collected: 510000, projected: 480000 },
+  { week: 'W4 (Oct 22-28)', collected: 390000, projected: 540000 },
+  { week: 'W5 (Oct 29-31)', collected: 175000, projected: 250000 },
 ];
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
@@ -321,6 +331,81 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
       </div>
+
+      {/* Chart 3: Financial Velocity & Forecasting (Non-Trainer) */}
+      {!isTrainer && (
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Monthly Fee Collection Velocity & Projection (₹ INR)
+              </h3>
+              <p className="text-xs text-slate-400">
+                Weekly realized revenue vs projected recovery target across all active enrollments
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant="success" size="sm">
+                +12.4% vs Target
+              </Badge>
+            </div>
+          </div>
+
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={FEE_FORECAST_DATA}>
+                <defs>
+                  <linearGradient id="colorCollected" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                  </linearGradient>
+                  <linearGradient id="colorProjected" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="week" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                <YAxis
+                  stroke="#94a3b8"
+                  fontSize={11}
+                  tickLine={false}
+                  tickFormatter={val => `₹${(val / 1000).toFixed(0)}k`}
+                />
+                <Tooltip
+                  formatter={(val: any) => [formatINR(val), '']}
+                  contentStyle={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '12px',
+                  }}
+                />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
+                <Area
+                  type="monotone"
+                  dataKey="collected"
+                  name="Collected Revenue"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorCollected)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="projected"
+                  name="Projected Target"
+                  stroke="#6366f1"
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                  fillOpacity={1}
+                  fill="url(#colorProjected)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Operations Quick Callout */}
       <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">

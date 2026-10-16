@@ -23,6 +23,7 @@ import {
   Eye,
   CheckCircle,
   Trash2,
+  Download,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -366,6 +367,43 @@ export const StudentsView: React.FC = () => {
     }
   };
 
+  const handleExportCSV = () => {
+    if (!students || students.length === 0) {
+      showToast('No student records to export', 'warning');
+      return;
+    }
+    const headers = isTrainer
+      ? ['ID', 'Name', 'Email', 'Batch', 'Course', 'Attendance Rate', 'Missed Classes 30d', 'Status']
+      : ['ID', 'Name', 'Email', 'Batch', 'Course', 'Attendance Rate', 'Missed Classes 30d', 'Status', 'Total Fee', 'Fee Paid', 'Fee Pending'];
+
+    const rows = filteredData.map(s => {
+      const base = [
+        `"${s.id}"`,
+        `"${s.name}"`,
+        `"${s.email}"`,
+        `"${s.batch_name}"`,
+        `"${s.course_name}"`,
+        `"${s.attendance_rate}%"`,
+        `"${s.missed_classes_last_30d}"`,
+        `"${s.status}"`,
+      ];
+      if (!isTrainer) {
+        base.push(`"${s.total_fee}"`, `"${s.fee_paid}"`, `"${s.fee_pending}"`);
+      }
+      return base.join(',');
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `students_roster_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${filteredData.length} student records to CSV`, 'success');
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -379,15 +417,25 @@ export const StudentsView: React.FC = () => {
           </p>
         </div>
 
-        {!isAccounts && !isTrainer && (
+        <div className="flex items-center gap-2.5">
           <button
-            onClick={handleOpenAdd}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 shadow-xs transition-colors shrink-0"
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-2xs transition-colors shrink-0"
           >
-            <Plus className="w-4 h-4" />
-            Add New Student
+            <Download className="w-4 h-4 text-slate-500" />
+            Export CSV
           </button>
-        )}
+
+          {!isAccounts && !isTrainer && (
+            <button
+              onClick={handleOpenAdd}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 shadow-xs transition-colors shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              Add New Student
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
