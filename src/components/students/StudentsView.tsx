@@ -22,6 +22,7 @@ import {
   AlertCircle,
   Eye,
   CheckCircle,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -241,13 +242,22 @@ export const StudentsView: React.FC = () => {
           id: 'actions',
           header: 'Manage',
           cell: info => (
-            <button
-              onClick={() => handleOpenEdit(info.row.original)}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-              title="Edit Student"
-            >
-              <Edit2 className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handleOpenEdit(info.row.original)}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                title="Edit Student"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleDeleteStudent(info.row.original.id, info.row.original.name)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                title="Delete Student"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           ),
         }) as any
       );
@@ -342,6 +352,17 @@ export const StudentsView: React.FC = () => {
       loadData();
     } catch (err: any) {
       showToast(err.message || 'Operation failed', 'error');
+    }
+  };
+
+  const handleDeleteStudent = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete ${name}?`)) return;
+    try {
+      await api.deleteStudent(id);
+      showToast(`Student ${name} deleted successfully`, 'success');
+      loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete student', 'error');
     }
   };
 

@@ -301,6 +301,17 @@ class Repository:
                 return s
         return {"id": student_id, **updates}
 
+    async def delete_student(self, student_id: str) -> dict:
+        sb = get_supabase()
+        if sb:
+            try:
+                res = sb.table("students").delete().eq("id", student_id).execute()
+                print(f"[Supabase] Deleted student {student_id}")
+            except Exception as e:
+                print(f"[Supabase delete_student error]: {e}")
+        self.students = [s for s in self.students if s["id"] != student_id]
+        return {"success": True, "id": student_id}
+
     # Batches
     async def get_batches(self) -> List[dict]:
         sb = get_supabase()

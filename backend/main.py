@@ -116,6 +116,10 @@ async def add_student(data: StudentCreate, user: dict = Depends(require_roles("o
 async def update_student(student_id: str, updates: dict, user: dict = Depends(require_roles("owner", "counselor"))):
     return await repo.update_student(student_id, updates)
 
+@app.delete("/students/{student_id}")
+async def delete_student(student_id: str, user: dict = Depends(require_roles("owner", "counselor"))):
+    return await repo.delete_student(student_id)
+
 # -------------------------------------------------------------
 # 3. BATCHES
 # -------------------------------------------------------------

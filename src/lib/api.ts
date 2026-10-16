@@ -248,6 +248,16 @@ export const api = {
     });
   },
 
+  async deleteStudent(id: string): Promise<{ success: boolean; id: string }> {
+    if (isMockMode()) {
+      mockStudentsStore = mockStudentsStore.filter(s => s.id !== id);
+      return { success: true, id };
+    }
+    return apiFetch<{ success: boolean; id: string }>(`/students/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
   // 3. Batches
   async getBatches(): Promise<Batch[]> {
     if (isMockMode()) {
