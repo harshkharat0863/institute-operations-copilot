@@ -12,6 +12,10 @@ import {
   User,
   UserRole,
   Weekday,
+  PaymentReconciliation,
+  Certificate,
+  ClassRecording,
+  DropoutRiskStudent,
 } from '../types';
 import { decodeJwt, generateMockJwt } from './jwt';
 import {
@@ -32,6 +36,10 @@ import {
   generateInitialEMIs,
   generateInitialStudents,
   TRAINERS,
+  RECONCILIATIONS_DATA,
+  CERTIFICATES_DATA,
+  RECORDINGS_DATA,
+  DROPOUT_RISK_DATA,
 } from './mock/data';
 import { runRedTeamSuite } from './mock/redteam';
 import { generateTimetableFresh, getTimetable, replanTimetable } from './mock/timetable';
@@ -41,6 +49,10 @@ let mockStudentsStore: Student[] = generateInitialStudents();
 let mockBatchesStore: Batch[] = JSON.parse(JSON.stringify(BATCHES));
 let mockEmisStore: EMI[] = generateInitialEMIs(mockStudentsStore);
 let mockAttendanceStore: AttendanceRecord[] = generateInitialAttendance(mockStudentsStore);
+let mockReconciliationsStore: PaymentReconciliation[] = JSON.parse(JSON.stringify(RECONCILIATIONS_DATA));
+let mockCertificatesStore: Certificate[] = JSON.parse(JSON.stringify(CERTIFICATES_DATA));
+let mockRecordingsStore: ClassRecording[] = JSON.parse(JSON.stringify(RECORDINGS_DATA));
+let mockDropoutRiskStore: DropoutRiskStudent[] = JSON.parse(JSON.stringify(DROPOUT_RISK_DATA));
 
 /**
  * Determine if mock mode is active.
@@ -607,4 +619,183 @@ export const api = {
       results,
     };
   },
+
+  // 12. Fee Recognition & Payment Reconciliation (Accounts & Owner)
+  async getReconciliations(): Promise<PaymentReconciliation[]> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 120));
+      return [...mockReconciliationsStore];
+    }
+    return apiFetch<PaymentReconciliation[]>('/fees/reconciliations');
+  },
+
+  async reconcilePayment(id: string): Promise<PaymentReconciliation> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 200));
+      const item = mockReconciliationsStore.find(r => r.id === id);
+      if (!item) throw new Error('Reconciliation record not found');
+      item.status = 'reconciled';
+      item.receipt_url = `/receipts/REC-2026-${id}.pdf`;
+      // Also mark the matched student's EMI as paid
+      if (item.matched_emi_id) {
+        const emi = mockEmisStore.find(e => e.id === item.matched_emi_id);
+        if (emi) {
+          emi.status = 'paid';
+          emi.paid_date = new Date().toISOString().split('T')[0];
+        }
+      }
+      recordAuditLog({
+        user_name: 'Accounts Reconciler',
+        role: 'accounts',
+        action: 'fee_reconciliation',
+        target: item.utr_number,
+        details: `Reconciled payment of ₹${item.amount} from ${item.payer_name} (UTR: ${item.utr_number}) to student ${item.matched_student_name}.`,
+        ip_address: '127.0.0.1',
+        status: 'success',
+      });
+      return { ...item };
+    }
+    return apiFetch<PaymentReconciliation>(`/fees/reconciliations/${id}/settle`, { method: 'POST' });
+  },
+
+  async uploadReceiptOcr(file: File): Promise<{
+    utr_number: string;
+    payer_name: string;
+    amount: number;
+    payment_mode: 'UPI';
+    confidence: number;
+    matched_student: string;
+  }> {
+    await new Promise(r => setTimeout(r, 600)); // simulate OCR processing
+    return {
+      utr_number: `UPI/${Math.floor(100000000000 + Math.random() * 900000000000)}/HDFC`,
+      payer_name: 'Aarav Sharma',
+      amount: 6500,
+      payment_mode: 'UPI',
+      confidence: 96,
+      matched_student: 'Aarav Sharma (std_java_001)',
+    };
+  },
+
+  // 13. Certifications (Course Completion)
+  async getCertificates(): Promise<Certificate[]> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 120));
+      return [...mockCertificatesStore];
+    }
+    return apiFetch<Certificate[]>('/certifications');
+  },
+
+  async issueCertificate(studentId: string, courseId: string): Promise<Certificate> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 250));
+      const std = mockStudentsStore.find(s => s.id === studentId);
+      const course = COURSES.find(c => c.id === courseId);
+      const newCert: Certificate = {
+        id: `cert_${Date.now()}`,
+        student_id: studentId,
+        student_name: std?.name || 'Student',
+        course_id: courseId,
+        course_name: course?.name || 'Masterclass',
+        batch_name: std?.batch_name || 'Assigned Cohort',
+        issue_date: new Date().toISOString().split('T')[0],
+        verification_code: `CERT-2026-${course?.code || 'INST'}-${Math.floor(1000 + Math.random() * 9000)}`,
+        final_attendance: std?.attendance_rate || 90.0,
+        fee_clearance: (std?.fee_pending || 0) === 0,
+        status: 'issued',
+        signatory: 'Vikramaditya Mehta (Director)',
+        certificate_url: `https://credentials.institute.org/verify/CERT-2026-${course?.code || 'INST'}`,
+      };
+      mockCertificatesStore.unshift(newCert);
+      recordAuditLog({
+        user_name: 'Director Vikramaditya Mehta',
+        role: 'owner',
+        action: 'issue_certificate',
+        target: newCert.verification_code,
+        details: `Issued course completion certificate to ${newCert.student_name} for ${newCert.course_name}.`,
+        ip_address: '127.0.0.1',
+        status: 'success',
+      });
+      return newCert;
+    }
+    return apiFetch<Certificate>('/certifications/issue', {
+      method: 'POST',
+      body: JSON.stringify({ student_id: studentId, course_id: courseId }),
+    });
+  },
+
+  // 14. Class Recordings Library
+  async getRecordings(): Promise<ClassRecording[]> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 100));
+      return [...mockRecordingsStore];
+    }
+    return apiFetch<ClassRecording[]>('/recordings');
+  },
+
+  async addRecording(rec: Partial<ClassRecording>): Promise<ClassRecording> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 200));
+      const newRec: ClassRecording = {
+        id: `rec_sess_${Date.now()}`,
+        batch_id: rec.batch_id || 'b_java_a',
+        batch_name: rec.batch_name || 'Java Fullstack - Batch A',
+        course_name: rec.course_name || 'Java Fullstack Masterclass',
+        topic: rec.topic || 'Class Lecture & Lab Demo',
+        trainer_name: rec.trainer_name || 'Priya Sundaram',
+        date: new Date().toISOString().split('T')[0],
+        duration_minutes: rec.duration_minutes || 110,
+        source: rec.source || 'Lab 1 Recording Rig',
+        video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        thumbnail_url: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=480&auto=format&fit=crop&q=80',
+        views_count: 1,
+        key_timestamps: [
+          { time: '00:00', label: 'Lecture Intro' },
+          { time: '45:00', label: 'Hands-on Lab demo' },
+        ],
+      };
+      mockRecordingsStore.unshift(newRec);
+      return newRec;
+    }
+    return apiFetch<ClassRecording>('/recordings', {
+      method: 'POST',
+      body: JSON.stringify(rec),
+    });
+  },
+
+  // 15. Dropout Risk Radar & Interventions
+  async getDropoutRiskStudents(): Promise<DropoutRiskStudent[]> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 120));
+      return [...mockDropoutRiskStore];
+    }
+    return apiFetch<DropoutRiskStudent[]>('/students/dropout-risk');
+  },
+
+  async triggerDropoutIntervention(
+    id: string,
+    actionType: 'counseling_scheduled' | 'whatsapp_sent' | 'plan_restructured'
+  ): Promise<DropoutRiskStudent> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 200));
+      const student = mockDropoutRiskStore.find(s => s.id === id);
+      if (!student) throw new Error('Student risk profile not found');
+      student.intervention_status = actionType;
+      recordAuditLog({
+        user_name: 'Academic Counselor',
+        role: 'counselor',
+        action: 'dropout_intervention',
+        target: student.student_name,
+        details: `Triggered ${actionType.replace('_', ' ')} for high-risk student ${student.student_name} (${student.risk_score}% risk score).`,
+        ip_address: '127.0.0.1',
+        status: 'success',
+      });
+      return { ...student };
+    }
+    return apiFetch<DropoutRiskStudent>(`/students/dropout-risk/${id}/intervene`, {
+      method: 'POST',
+      body: JSON.stringify({ action_type: actionType }),
+    });
+  },
 };
+

@@ -12,6 +12,10 @@ import {
   Flame,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
+  Award,
+  Video,
+  ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
@@ -42,6 +46,14 @@ export const ALL_NAV_ITEMS: NavItemConfig[] = [
     badgeVariant: 'info',
   },
   {
+    id: 'dropout_risk',
+    label: 'Dropout Risk Radar',
+    icon: ShieldAlert,
+    allowedRoles: ['owner', 'counselor'],
+    badge: 'AI Risk',
+    badgeVariant: 'danger',
+  },
+  {
     id: 'students',
     label: 'Students',
     icon: Users,
@@ -54,24 +66,18 @@ export const ALL_NAV_ITEMS: NavItemConfig[] = [
     allowedRoles: ['owner', 'counselor', 'trainer'],
   },
   {
+    id: 'recordings',
+    label: 'Class Recordings',
+    icon: Video,
+    allowedRoles: ['owner', 'counselor', 'trainer'],
+    badge: '1080p',
+    badgeVariant: 'neutral',
+  },
+  {
     id: 'attendance',
     label: 'Attendance & Logs',
     icon: CheckCircle2,
     allowedRoles: ['owner', 'counselor', 'trainer'],
-  },
-  {
-    id: 'fees',
-    label: 'Fees & EMIs',
-    icon: IndianRupee,
-    allowedRoles: ['owner', 'accounts'],
-  },
-  {
-    id: 'approvals',
-    label: 'Approvals Queue',
-    icon: ShieldCheck,
-    allowedRoles: ['owner', 'accounts', 'counselor'],
-    badge: 'Outbox',
-    badgeVariant: 'warning',
   },
   {
     id: 'timetable',
@@ -80,6 +86,36 @@ export const ALL_NAV_ITEMS: NavItemConfig[] = [
     allowedRoles: ['owner', 'trainer'],
     badge: '0 Conflicts',
     badgeVariant: 'success',
+  },
+  {
+    id: 'fees',
+    label: 'Fees & EMIs',
+    icon: IndianRupee,
+    allowedRoles: ['owner', 'accounts'],
+  },
+  {
+    id: 'fee_recognition',
+    label: 'Fee Recognition & OCR',
+    icon: CreditCard,
+    allowedRoles: ['owner', 'accounts'],
+    badge: 'UPI OCR',
+    badgeVariant: 'purple',
+  },
+  {
+    id: 'certifications',
+    label: 'Certifications',
+    icon: Award,
+    allowedRoles: ['owner', 'counselor', 'trainer'],
+    badge: 'Verified',
+    badgeVariant: 'success',
+  },
+  {
+    id: 'approvals',
+    label: 'Approvals Queue',
+    icon: ShieldCheck,
+    allowedRoles: ['owner', 'accounts', 'counselor'],
+    badge: 'Outbox',
+    badgeVariant: 'warning',
   },
   {
     id: 'audit',

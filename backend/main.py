@@ -13,7 +13,8 @@ from dotenv import load_dotenv
 
 from backend.models import (
     User, StudentCreate, BatchCreate, CheckInRequest, OnlineJoinRequest,
-    DraftRemindersRequest, BulkApproveRequest, ReplanRequest
+    DraftRemindersRequest, BulkApproveRequest, ReplanRequest,
+    IssueCertificateRequest, DropoutInterventionRequest
 )
 from backend.repository import repo, DEMO_USERS
 from backend.copilot import process_copilot_ask
@@ -242,6 +243,46 @@ async def get_query_log(user: dict = Depends(require_roles("owner"))):
 @app.post("/redteam/run")
 async def run_red_team(user: dict = Depends(require_roles("owner"))):
     return get_red_team_results()
+
+# -------------------------------------------------------------
+# 12. FEE RECONCILIATION & RECOGNITION (Accounts & Owner)
+# -------------------------------------------------------------
+@app.get("/fees/reconciliations")
+async def get_reconciliations(user: dict = Depends(require_roles("owner", "accounts"))):
+    return await repo.get_reconciliations()
+
+@app.post("/fees/reconciliations/{rec_id}/settle")
+async def settle_reconciliation(rec_id: str, user: dict = Depends(require_roles("owner", "accounts"))):
+    return await repo.reconcile_payment(rec_id)
+
+# -------------------------------------------------------------
+# 13. CERTIFICATIONS
+# -------------------------------------------------------------
+@app.get("/certifications")
+async def get_certifications(user: dict = Depends(get_current_user)):
+    return await repo.get_certificates()
+
+@app.post("/certifications/issue")
+async def issue_certification(req: IssueCertificateRequest, user: dict = Depends(require_roles("owner", "counselor"))):
+    return await repo.issue_certificate(req.student_id, req.course_id)
+
+# -------------------------------------------------------------
+# 14. CLASS RECORDINGS
+# -------------------------------------------------------------
+@app.get("/recordings")
+async def get_recordings(user: dict = Depends(get_current_user)):
+    return await repo.get_recordings()
+
+# -------------------------------------------------------------
+# 15. DROPOUT RISK RADAR
+# -------------------------------------------------------------
+@app.get("/students/dropout-risk")
+async def get_dropout_risk(user: dict = Depends(require_roles("owner", "counselor"))):
+    return await repo.get_dropout_risk()
+
+@app.post("/students/dropout-risk/{student_id}/intervene")
+async def intervene_dropout_risk(student_id: str, req: DropoutInterventionRequest, user: dict = Depends(require_roles("owner", "counselor"))):
+    return await repo.intervene_dropout_risk(student_id, req.action_type)
 
 # Health check
 @app.get("/health")

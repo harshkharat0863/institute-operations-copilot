@@ -20,6 +20,10 @@ import { ApprovalsView } from './components/approvals/ApprovalsView';
 import { TimetableView } from './components/timetable/TimetableView';
 import { AuditView } from './components/audit/AuditView';
 import { RedTeamView } from './components/redteam/RedTeamView';
+import { FeeRecognitionView } from './components/fees/FeeRecognitionView';
+import { CertificationsView } from './components/certifications/CertificationsView';
+import { RecordingsView } from './components/recordings/RecordingsView';
+import { DropoutRiskView } from './components/dropout/DropoutRiskView';
 import { Info, BookOpen, Layers, Download } from 'lucide-react';
 import { Modal } from './components/common/Modal';
 
@@ -88,6 +92,14 @@ function MainApp() {
         return <AttendanceView />;
       case 'fees':
         return <FeesView />;
+      case 'fee_recognition':
+        return <FeeRecognitionView />;
+      case 'certifications':
+        return <CertificationsView />;
+      case 'recordings':
+        return <RecordingsView />;
+      case 'dropout_risk':
+        return <DropoutRiskView />;
       case 'approvals':
         return <ApprovalsView />;
       case 'timetable':

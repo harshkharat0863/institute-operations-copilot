@@ -208,3 +208,73 @@ export interface RedTeamTestResult {
   sql_attempted?: string;
   response_summary: string;
 }
+
+export interface PaymentReconciliation {
+  id: string;
+  utr_number: string;
+  payer_name: string;
+  amount: number;
+  payment_mode: 'UPI' | 'NEFT' | 'NetBanking' | 'Card' | 'Cheque';
+  timestamp: string;
+  matched_student_id?: string;
+  matched_student_name?: string;
+  matched_emi_id?: string;
+  confidence_score: number; // 0 - 100
+  status: 'matched' | 'unmatched' | 'reconciled';
+  bank_reference: string;
+  receipt_url?: string;
+}
+
+export interface Certificate {
+  id: string;
+  student_id: string;
+  student_name: string;
+  course_id: string;
+  course_name: string;
+  batch_name: string;
+  issue_date: string;
+  verification_code: string;
+  final_attendance: number;
+  fee_clearance: boolean;
+  status: 'issued' | 'eligible' | 'ineligible';
+  signatory: string;
+  certificate_url?: string;
+}
+
+export interface ClassRecording {
+  id: string;
+  batch_id: string;
+  batch_name: string;
+  course_name: string;
+  topic: string;
+  trainer_name: string;
+  date: string;
+  duration_minutes: number;
+  source: 'Lab 1 Recording Rig' | 'Zoom Cloud' | 'Studio 3 Hybrid';
+  video_url: string;
+  thumbnail_url: string;
+  views_count: number;
+  notes_download_url?: string;
+  code_repo_url?: string;
+  key_timestamps: { time: string; label: string }[];
+}
+
+export interface DropoutRiskStudent {
+  id: string;
+  student_id: string;
+  student_name: string;
+  batch_name: string;
+  course_name: string;
+  risk_score: number; // 0 to 100
+  risk_tier: 'critical' | 'high' | 'moderate' | 'safe';
+  attendance_rate: number;
+  missed_classes: number;
+  consecutive_absences: number;
+  overdue_emis_count: number;
+  total_overdue_amount: number;
+  last_login_days_ago: number;
+  reasons: string[];
+  recommended_intervention: string;
+  intervention_status: 'none' | 'counseling_scheduled' | 'whatsapp_sent' | 'plan_restructured';
+}
+

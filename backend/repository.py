@@ -687,6 +687,215 @@ class Repository:
             created_at=time.strftime('%Y-%m-%dT%H:%M:%SZ')
         )
 
+    # 12. Fee Recognition & Reconciliations
+    async def get_reconciliations(self) -> List[dict]:
+        return [
+            {
+                "id": "rec_101",
+                "utr_number": "UPI/428910284910/HDFC",
+                "payer_name": "Aarav Sharma",
+                "amount": 6500,
+                "payment_mode": "UPI",
+                "timestamp": "2026-10-16T14:22:10Z",
+                "matched_student_id": "std_java_001",
+                "matched_student_name": "Aarav Sharma",
+                "matched_emi_id": "emi_java_1",
+                "confidence_score": 98,
+                "status": "matched",
+                "bank_reference": "HDFC0001248-TXN9921"
+            },
+            {
+                "id": "rec_102",
+                "utr_number": "NEFT/SBIN0048192019/Rohan",
+                "payer_name": "Rohan Gupta",
+                "amount": 7000,
+                "payment_mode": "NEFT",
+                "timestamp": "2026-10-16T15:10:45Z",
+                "matched_student_id": "std_java_002",
+                "matched_student_name": "Rohan Gupta",
+                "matched_emi_id": "emi_java_2",
+                "confidence_score": 95,
+                "status": "matched",
+                "bank_reference": "SBIN-NEFT-881920"
+            },
+            {
+                "id": "rec_103",
+                "utr_number": "UPI/428991201940/ICICI",
+                "payer_name": "Sneha Patil",
+                "amount": 6500,
+                "payment_mode": "UPI",
+                "timestamp": "2026-10-16T16:04:12Z",
+                "matched_student_id": "std_java_003",
+                "matched_student_name": "Sneha Patil",
+                "matched_emi_id": "emi_java_3",
+                "confidence_score": 99,
+                "status": "reconciled",
+                "bank_reference": "ICIC0000412-UPI991",
+                "receipt_url": "/receipts/REC-2026-103.pdf"
+            }
+        ]
+
+    async def reconcile_payment(self, rec_id: str) -> dict:
+        return {
+            "id": rec_id,
+            "status": "reconciled",
+            "receipt_url": f"/receipts/REC-2026-{rec_id}.pdf",
+            "amount": 6500,
+            "matched_student_name": "Aarav Sharma",
+            "utr_number": "UPI/428910284910/HDFC"
+        }
+
+    # 13. Certifications
+    async def get_certificates(self) -> List[dict]:
+        return [
+            {
+                "id": "cert_1",
+                "student_id": "std_grad_1",
+                "student_name": "Priyanka Nair",
+                "course_id": "c_java",
+                "course_name": "Java Fullstack Masterclass",
+                "batch_name": "Java Fullstack - Batch Summer",
+                "issue_date": "2026-10-10",
+                "verification_code": "CERT-2026-JAVA-9182",
+                "final_attendance": 94.5,
+                "fee_clearance": True,
+                "status": "issued",
+                "signatory": "Vikramaditya Mehta (Director)",
+                "certificate_url": "https://credentials.institute.org/verify/CERT-2026-JAVA-9182"
+            },
+            {
+                "id": "cert_5",
+                "student_id": "std_10",
+                "student_name": "Anjali Verma",
+                "course_id": "c_webdev",
+                "course_name": "Full Stack MERN & Next.js",
+                "batch_name": "Full Stack MERN - Batch A",
+                "issue_date": "2026-10-15",
+                "verification_code": "CERT-2026-MERN-3129",
+                "final_attendance": 91.2,
+                "fee_clearance": True,
+                "status": "eligible",
+                "signatory": "Vikramaditya Mehta (Director)"
+            }
+        ]
+
+    async def issue_certificate(self, student_id: str, course_id: str) -> dict:
+        std = next((s for s in self.students if s["id"] == student_id), None)
+        course = next((c for c in self.courses if c["id"] == course_id), None)
+        return {
+            "id": f"cert_{int(time.time())}",
+            "student_id": student_id,
+            "student_name": std["name"] if std else "Student",
+            "course_id": course_id,
+            "course_name": course["name"] if course else "Masterclass",
+            "batch_name": std.get("batch_name", "Assigned Cohort") if std else "Cohort",
+            "issue_date": time.strftime('%Y-%m-%d'),
+            "verification_code": f"CERT-2026-VERIFIED-{int(time.time() % 10000)}",
+            "final_attendance": std.get("attendance_rate", 92.0) if std else 90.0,
+            "fee_clearance": True,
+            "status": "issued",
+            "signatory": "Vikramaditya Mehta (Director)"
+        }
+
+    # 14. Class Recordings
+    async def get_recordings(self) -> List[dict]:
+        return [
+            {
+                "id": "rec_sess_1",
+                "batch_id": "b_java_a",
+                "batch_name": "Java Fullstack - Batch A",
+                "course_name": "Java Fullstack Masterclass",
+                "topic": "Spring Boot 3.3 Microservices: REST Endpoints, DTOs & Validation",
+                "trainer_name": "Priya Sundaram",
+                "date": "2026-10-14",
+                "duration_minutes": 115,
+                "source": "Lab 1 Recording Rig",
+                "video_url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                "thumbnail_url": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=480&auto=format&fit=crop&q=80",
+                "views_count": 38,
+                "notes_download_url": "/materials/java_microservices_lecture_14.pdf",
+                "code_repo_url": "https://github.com/institute/java-microservices-demo",
+                "key_timestamps": [
+                    {"time": "05:20", "label": "Architecture Overview & Service Registry"},
+                    {"time": "28:40", "label": "Writing Spring Data JPA Repositories"}
+                ]
+            },
+            {
+                "id": "rec_sess_2",
+                "batch_id": "b_py_a",
+                "batch_name": "Python Data Eng - Batch A",
+                "course_name": "Python Data Engineering & ML",
+                "topic": "Async FastAPI Data Pipelines & Pydantic V2 Schema Validation",
+                "trainer_name": "Rajesh Verma",
+                "date": "2026-10-15",
+                "duration_minutes": 120,
+                "source": "Studio 3 Hybrid",
+                "video_url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+                "thumbnail_url": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=480&auto=format&fit=crop&q=80",
+                "views_count": 42,
+                "notes_download_url": "/materials/fastapi_async_pipelines.pdf",
+                "code_repo_url": "https://github.com/institute/fastapi-data-eng",
+                "key_timestamps": [
+                    {"time": "10:15", "label": "Async Def vs Def in Event Loop"}
+                ]
+            }
+        ]
+
+    # 15. Dropout Risk Radar
+    async def get_dropout_risk(self) -> List[dict]:
+        return [
+            {
+                "id": "dr_1",
+                "student_id": "std_java_003",
+                "student_name": "Sneha Patil",
+                "batch_name": "Java Fullstack - Batch B",
+                "course_name": "Java Fullstack Masterclass",
+                "risk_score": 92,
+                "risk_tier": "critical",
+                "attendance_rate": 61,
+                "missed_classes": 5,
+                "consecutive_absences": 4,
+                "overdue_emis_count": 1,
+                "total_overdue_amount": 6500,
+                "last_login_days_ago": 6,
+                "reasons": [
+                    "5 missed classes in the last 30 days (<65% attendance rate)",
+                    "4 consecutive absences since last lab check-in",
+                    "Overdue EMI installment of ₹6,500 due today"
+                ],
+                "recommended_intervention": "Immediate counseling call + offer 1-on-1 lab makeup slot + EMI grace window",
+                "intervention_status": "none"
+            },
+            {
+                "id": "dr_2",
+                "student_id": "std_java_001",
+                "student_name": "Aarav Sharma",
+                "batch_name": "Java Fullstack - Batch A",
+                "course_name": "Java Fullstack Masterclass",
+                "risk_score": 79,
+                "risk_tier": "high",
+                "attendance_rate": 68,
+                "missed_classes": 4,
+                "consecutive_absences": 2,
+                "overdue_emis_count": 1,
+                "total_overdue_amount": 6500,
+                "last_login_days_ago": 4,
+                "reasons": [
+                    "Attendance rate dropped to 68%",
+                    "Upcoming EMI installment due in 2 days (₹6,500)"
+                ],
+                "recommended_intervention": "Send WhatsApp academic encouragement alert + counselor mentor check-in",
+                "intervention_status": "none"
+            }
+        ]
+
+    async def intervene_dropout_risk(self, dr_id: str, action: str) -> dict:
+        return {
+            "id": dr_id,
+            "intervention_status": action,
+            "status": "updated"
+        }
+
     # Audit & Query Logs
     async def get_audit(self) -> List[dict]:
         sb = get_supabase()
@@ -711,3 +920,4 @@ class Repository:
         return self.query_logs
 
 repo = Repository()
+

@@ -200,3 +200,76 @@ class RedTeamTestResult(BaseModel):
     simulated_role: UserRole
     sql_attempted: Optional[str] = None
     response_summary: str
+
+class PaymentReconciliation(BaseModel):
+    id: str
+    utr_number: str
+    payer_name: str
+    amount: float
+    payment_mode: Literal['UPI', 'NEFT', 'NetBanking', 'Card', 'Cheque']
+    timestamp: str
+    matched_student_id: Optional[str] = None
+    matched_student_name: Optional[str] = None
+    matched_emi_id: Optional[str] = None
+    confidence_score: int
+    status: Literal['matched', 'unmatched', 'reconciled']
+    bank_reference: str
+    receipt_url: Optional[str] = None
+
+class Certificate(BaseModel):
+    id: str
+    student_id: str
+    student_name: str
+    course_id: str
+    course_name: str
+    batch_name: str
+    issue_date: str
+    verification_code: str
+    final_attendance: float
+    fee_clearance: bool
+    status: Literal['issued', 'eligible', 'ineligible']
+    signatory: str
+    certificate_url: Optional[str] = None
+
+class IssueCertificateRequest(BaseModel):
+    student_id: str
+    course_id: str
+
+class ClassRecording(BaseModel):
+    id: str
+    batch_id: str
+    batch_name: str
+    course_name: str
+    topic: str
+    trainer_name: str
+    date: str
+    duration_minutes: int
+    source: str
+    video_url: str
+    thumbnail_url: str
+    views_count: int
+    notes_download_url: Optional[str] = None
+    code_repo_url: Optional[str] = None
+    key_timestamps: List[dict] = []
+
+class DropoutRiskStudent(BaseModel):
+    id: str
+    student_id: str
+    student_name: str
+    batch_name: str
+    course_name: str
+    risk_score: int
+    risk_tier: Literal['critical', 'high', 'moderate', 'safe']
+    attendance_rate: float
+    missed_classes: int
+    consecutive_absences: int
+    overdue_emis_count: int
+    total_overdue_amount: float
+    last_login_days_ago: int
+    reasons: List[str]
+    recommended_intervention: str
+    intervention_status: Literal['none', 'counseling_scheduled', 'whatsapp_sent', 'plan_restructured']
+
+class DropoutInterventionRequest(BaseModel):
+    action_type: Literal['counseling_scheduled', 'whatsapp_sent', 'plan_restructured']
+
