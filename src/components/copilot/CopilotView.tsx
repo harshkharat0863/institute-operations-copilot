@@ -245,40 +245,40 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
   const activeCategoryObj = CATEGORIZED_PROMPTS.find(c => c.id === selectedCategory) || CATEGORIZED_PROMPTS[0];
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8.5rem)] bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-7.5rem)] bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
       {/* Header */}
-      <div className="px-6 py-3.5 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between shrink-0">
+      <div className="px-5 py-3 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-xs">
-            <Bot className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shrink-0">
+            <Bot className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-bold text-slate-900 text-sm sm:text-base">
-                Operational Copilot Engine
+              <h2 className="font-semibold text-slate-900 text-sm">
+                Operations Copilot
               </h2>
-              <Badge variant="purple" size="sm">
-                SafeQuery™ v1.4
-              </Badge>
+              <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+                SafeQuery™ AST
+              </span>
             </div>
             <p className="text-xs text-slate-500">
-              Natural Language → Safe SQL • Active Persona: <strong className="capitalize text-slate-700">{role}</strong>
+              Role-verified access · Context: <span className="font-semibold capitalize text-slate-700">{role}</span>
             </p>
           </div>
         </div>
 
-        <div className="hidden sm:flex items-center gap-3 text-xs text-slate-500">
-          <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full font-medium">
-            <Database className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Read-Only Verification</span>
-          </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-medium bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-md">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Read-Only Guard
+          </span>
         </div>
       </div>
 
-      {/* Category Tabs & Quick Prompts Bar */}
-      <div className="bg-slate-50/90 border-b border-slate-200 shrink-0">
-        {/* Category Pill Tabs */}
-        <div className="px-6 pt-2.5 pb-1 flex items-center gap-1.5 overflow-x-auto">
+      {/* Suggested Prompts & Tabs */}
+      <div className="bg-slate-50/70 border-b border-slate-200 px-4 py-2 shrink-0 space-y-2">
+        {/* Category Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
           {CATEGORIZED_PROMPTS.map(cat => {
             const Icon = cat.icon;
             const isSelected = selectedCategory === cat.id;
@@ -286,10 +286,10 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
                   isSelected
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:bg-slate-200/70'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -299,17 +299,17 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
           })}
         </div>
 
-        {/* Suggested Queries for Active Category */}
-        <div className="px-6 py-2 flex items-center gap-2 overflow-x-auto">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">
-            Click to Ask:
+        {/* Quick Queries */}
+        <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 text-xs">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">
+            Quick Prompts:
           </span>
           {activeCategoryObj.queries.map((q, idx) => (
             <button
               key={idx}
               onClick={() => handleAsk(q)}
               disabled={isSubmitting}
-              className="text-xs text-indigo-950 bg-white border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/70 px-3 py-1.5 rounded-full whitespace-nowrap shadow-2xs transition-all disabled:opacity-50 cursor-pointer"
+              className="text-xs text-slate-700 bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 px-2.5 py-1 rounded-md whitespace-nowrap transition-colors disabled:opacity-50 cursor-pointer text-left"
             >
               {q}
             </button>
@@ -317,8 +317,8 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
         </div>
       </div>
 
-      {/* Chat Thread Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      {/* Messages Thread */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/30">
         {messages.map(msg => {
           const isUser = msg.sender === 'user';
           const resp = msg.response;
@@ -334,142 +334,125 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
             >
               {/* Avatar */}
               <div
-                className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold ${
+                className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-semibold ${
                   isUser
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 text-indigo-700 border border-slate-200'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white text-slate-700 border border-slate-200'
                 }`}
               >
-                {isUser ? user?.name?.charAt(0) || 'U' : <Bot className="w-4 h-4" />}
+                {isUser ? user?.name?.charAt(0) || 'U' : <Bot className="w-3.5 h-3.5" />}
               </div>
 
-              {/* Message Content Bubble */}
+              {/* Message Body */}
               <div
-                className={`flex-1 rounded-2xl p-4 transition-all ${
+                className={`flex-1 rounded-xl p-4 text-xs ${
                   isUser
-                    ? 'bg-indigo-600 text-white rounded-tr-xs shadow-xs text-sm'
-                    : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs shadow-2xs space-y-3.5'
+                    ? 'bg-indigo-600 text-white leading-relaxed text-sm'
+                    : 'bg-white border border-slate-200 text-slate-800 space-y-3 shadow-2xs'
                 }`}
               >
-                {/* User Message Text */}
+                {/* User Message */}
                 {isUser && <div>{msg.text}</div>}
 
-                {/* Loading Skeleton */}
+                {/* Loading Indicator */}
                 {!isUser && msg.isLoading && (
-                  <div className="space-y-3 py-2 animate-pulse">
+                  <div className="space-y-2 py-1">
                     <div className="flex items-center gap-2 text-xs text-indigo-600 font-medium">
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      Interpreting intent, verifying role boundaries & synthesizing safe query...
+                      Analyzing request, verifying role schema boundaries...
                     </div>
-                    <div className="h-4 bg-slate-100 rounded w-3/4" />
-                    <div className="h-20 bg-slate-100 rounded-xl w-full" />
+                    <div className="h-3 bg-slate-100 rounded w-2/3 animate-pulse" />
                   </div>
                 )}
 
-                {/* Assistant Plain Text Answer */}
+                {/* Plain Text Reply */}
                 {!isUser && !msg.isLoading && msg.text && (
-                  <p className="text-sm leading-relaxed text-slate-700">{msg.text}</p>
+                  <p className="text-xs sm:text-sm leading-relaxed text-slate-700">{msg.text}</p>
                 )}
 
-                {/* Assistant Response Package */}
+                {/* Structured Copilot Response */}
                 {!isUser && !msg.isLoading && resp && (
-                  <div className="space-y-3.5">
+                  <div className="space-y-3 text-xs">
                     
-                    {/* 1. Structured Operation Pill (Bridge between intent and DB) */}
+                    {/* Operation Pill */}
                     {resp.operation && (
-                      <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-                        <span className="font-bold text-slate-600 flex items-center gap-1 text-[11px] uppercase tracking-wider">
-                          <Sparkles className="w-3 h-3 text-indigo-600" />
-                          Approved Operation:
+                      <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-md bg-slate-50 border border-slate-200">
+                        <span className="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">
+                          Approved Function:
                         </span>
-                        <code className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono text-[11px] font-bold">
+                        <code className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-indigo-700 font-mono text-[11px] font-semibold">
                           {resp.operation}
                         </code>
                         {resp.category && (
-                          <Badge
-                            variant={
-                              resp.category === 'fees'
-                                ? 'warning'
-                                : resp.category === 'attendance'
-                                ? 'info'
-                                : resp.category === 'timetable'
-                                ? 'success'
-                                : 'purple'
-                            }
-                            size="sm"
-                          >
-                            {resp.category.toUpperCase()}
+                          <Badge variant="info" size="sm">
+                            {resp.category}
                           </Badge>
                         )}
                         {resp.operation_payload && (
-                          <span className="text-[10px] font-mono text-slate-400 ml-auto truncate max-w-[280px]">
+                          <span className="text-[10px] font-mono text-slate-400 ml-auto truncate max-w-[240px]">
                             {JSON.stringify(resp.operation_payload)}
                           </span>
                         )}
                       </div>
                     )}
 
-                    {/* 2. Short Natural Language Answer Summary */}
+                    {/* Summary Answer */}
                     <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm leading-relaxed font-medium text-slate-900">
+                      <p className="text-xs sm:text-sm font-medium text-slate-900 leading-relaxed">
                         {resp.answer}
                       </p>
                       {resp.status === 'ok' && resp.row_count > 0 && (
-                        <Badge variant="success" size="sm" dot>
-                          {resp.row_count} records
-                        </Badge>
+                        <span className="shrink-0 px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
+                          {resp.row_count} rows
+                        </span>
                       )}
                     </div>
 
-                    {/* 3. BLOCKED REFUSAL CARD (e.g. Trainer asking for fees) */}
+                    {/* Blocked Alert */}
                     {isBlocked && (
-                      <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 space-y-2">
+                      <div className="p-3.5 rounded-lg bg-rose-50 border-l-4 border-l-rose-500 border border-rose-200 text-rose-900 space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0" />
-                          <span className="font-bold text-sm">Role-Based Access Control Refusal</span>
-                          <Badge variant="danger" size="sm" className="ml-auto">
-                            Layer: {resp.blocked_layer || 'Role View'}
-                          </Badge>
+                          <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span className="font-semibold text-xs">Role Permission Refusal</span>
+                          <span className="ml-auto text-[10px] font-mono text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded">
+                            {resp.blocked_layer || 'Role View'}
+                          </span>
                         </div>
-                        <p className="text-xs text-rose-800 leading-relaxed font-medium">
+                        <p className="text-xs text-rose-800 leading-relaxed">
                           {resp.blocked_reason}
                         </p>
-                        <div className="text-[11px] text-rose-700 bg-rose-100/60 p-2.5 rounded-lg">
-                          <strong>Rule Enforced:</strong> Trainers are restricted to academic rosters and attendance. Financial ledgers, fee payments, and unmasked contacts are strictly protected.
-                        </div>
                       </div>
                     )}
 
-                    {/* 4. PARTIAL REFUSAL NOTE */}
+                    {/* Partial Refusal */}
                     {isPartial && (
-                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2.5 text-xs">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="p-2.5 rounded-md bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2 text-xs">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                         <div>
-                          <span className="font-bold">Partial Security Redaction:</span>{' '}
-                          {resp.partial_explanation}
+                          <strong className="font-semibold">Security Redaction:</strong> {resp.partial_explanation}
                         </div>
                       </div>
                     )}
 
-                    {/* 5. VERIFIABLE DATA RESULTS TABLE */}
+                    {/* Verifiable Table */}
                     {resp.rows && resp.rows.length > 0 && (
-                      <div className="rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-                        <div className="overflow-x-auto">
+                      <div className="rounded-lg border border-slate-200 overflow-hidden">
+                        <div className="overflow-x-auto max-h-64">
                           <table className="w-full text-left border-collapse text-xs">
-                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
+                            <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-500 font-semibold text-[11px]">
                               <tr>
                                 {resp.columns.map((col, idx) => (
-                                  <th key={idx} className="py-2.5 px-3.5 whitespace-nowrap">
+                                  <th key={idx} className="py-2 px-3 whitespace-nowrap">
                                     {col}
                                   </th>
                                 ))}
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 font-normal">
+                            <tbody className="divide-y divide-slate-100">
                               {resp.rows.map((row, rIdx) => (
                                 <tr key={rIdx} className="hover:bg-slate-50/70">
                                   {row.map((cell: any, cIdx: number) => (
-                                    <td key={cIdx} className="py-2.5 px-3.5 text-slate-800 whitespace-nowrap">
+                                    <td key={cIdx} className="py-2 px-3 text-slate-800 whitespace-nowrap">
                                       {String(cell)}
                                     </td>
                                   ))}
@@ -481,51 +464,49 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
                       </div>
                     )}
 
-                    {/* 6. DRAFT WHATSAPP REMINDERS & HUMAN-IN-THE-LOOP SECTION */}
+                    {/* Human Approval Message Drafts */}
                     {resp.can_draft_reminders && resp.generated_actions && (
-                      <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-3">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="text-xs text-emerald-950">
-                            <div className="font-bold flex items-center gap-1.5">
-                              <MessageSquare className="w-4 h-4 text-emerald-700" />
-                              Human-in-the-Loop Action Ready
+                      <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-lg space-y-2.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <div className="font-semibold text-xs text-emerald-950 flex items-center gap-1.5">
+                              <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
+                              WhatsApp Action Staging
                             </div>
-                            <div className="text-[11px] text-emerald-800 mt-0.5">
-                              {resp.generated_actions.length} personalized WhatsApp reminder drafts staged. Staff review is required before sending.
+                            <div className="text-[11px] text-emerald-800">
+                              {resp.generated_actions.length} message drafts prepared. Requires review before dispatch.
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-2">
                             <button
                               onClick={() => toggleDrafts(msg.id)}
-                              className="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-white hover:bg-emerald-100 text-emerald-900 text-xs font-semibold transition-colors cursor-pointer"
+                              className="px-2.5 py-1 rounded border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-900 text-xs font-medium cursor-pointer"
                             >
-                              {isDraftsExpanded ? 'Hide Drafts' : 'Preview Messages'}
+                              {isDraftsExpanded ? 'Hide Previews' : 'Preview'}
                             </button>
                             <button
                               onClick={() => handleDraftReminders(resp.generated_actions)}
-                              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                              className="flex items-center gap-1 px-3 py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold cursor-pointer shadow-2xs"
                             >
-                              <Send className="w-3.5 h-3.5" />
-                              Stage to Approvals Queue
-                              <ArrowRight className="w-3.5 h-3.5" />
+                              <span>Stage to Approvals</span>
+                              <ArrowRight className="w-3 h-3" />
                             </button>
                           </div>
                         </div>
 
-                        {/* Collapsible Message Previews */}
                         {isDraftsExpanded && (
-                          <div className="pt-2 border-t border-emerald-200 space-y-2">
+                          <div className="pt-2 border-t border-emerald-200 space-y-1.5">
                             {resp.generated_actions.map((act, aIdx) => (
                               <div
                                 key={aIdx}
-                                className="p-2.5 rounded-lg bg-white border border-emerald-200 text-xs text-slate-700 space-y-1"
+                                className="p-2 rounded bg-white border border-emerald-100 text-xs text-slate-700 space-y-0.5"
                               >
-                                <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-900">
-                                  <span>To: {act.student_name} ({act.phone_masked})</span>
+                                <div className="flex items-center justify-between font-semibold text-emerald-950 text-[11px]">
+                                  <span>{act.student_name} ({act.phone_masked})</span>
                                   {act.amount && <span className="font-mono">EMI: ₹{act.amount.toLocaleString()}</span>}
                                 </div>
-                                <p className="text-[11px] text-slate-600 italic bg-slate-50 p-2 rounded border border-slate-100">
+                                <p className="text-[11px] text-slate-600 italic">
                                   "{act.message}"
                                 </p>
                               </div>
@@ -535,49 +516,44 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
                       </div>
                     )}
 
-                    {/* 7. QUERY TRANSPARENCY & SQL INSPECTOR */}
-                    <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+                    {/* Query Transparency */}
+                    <div className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50/60">
                       <button
                         onClick={() => toggleQuery(msg.id)}
-                        className="w-full px-4 py-2 flex items-center justify-between text-xs font-semibold text-slate-700 hover:bg-slate-100/70 transition-colors cursor-pointer"
+                        className="w-full px-3 py-2 flex items-center justify-between text-xs font-medium text-slate-700 hover:bg-slate-100 cursor-pointer"
                       >
-                        <div className="flex items-center gap-2">
-                          <TableIcon className="w-3.5 h-3.5 text-indigo-600" />
-                          <span>Query Transparency & Execution Log</span>
+                        <div className="flex items-center gap-1.5">
+                          <TableIcon className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Generated SQL & Execution Log</span>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-[11px] font-mono text-slate-500">
-                            {resp.duration_ms}ms • {resp.row_count} rows
-                          </span>
+                        <div className="flex items-center gap-2 text-slate-500 text-[11px] font-mono">
+                          <span>{resp.duration_ms}ms</span>
                           {isQueryExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-slate-400" />
+                            <ChevronUp className="w-3.5 h-3.5" />
                           ) : (
-                            <ChevronDown className="w-4 h-4 text-slate-400" />
+                            <ChevronDown className="w-3.5 h-3.5" />
                           )}
                         </div>
                       </button>
 
                       {isQueryExpanded && (
-                        <div className="p-4 border-t border-slate-200 bg-slate-900 text-slate-200 text-xs font-mono space-y-2.5">
-                          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 pb-2 border-b border-slate-800">
-                            <div className="flex items-center gap-2">
-                              <span>Tables Touched:</span>
-                              <div className="flex gap-1.5 flex-wrap">
-                                {resp.tables_used.map((tbl, i) => (
-                                  <span
-                                    key={i}
-                                    className="px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700 font-mono text-[10px]"
-                                  >
-                                    {tbl}
-                                  </span>
-                                ))}
-                              </div>
+                        <div className="p-3 border-t border-slate-200 bg-slate-900 text-slate-200 text-xs font-mono space-y-2">
+                          <div className="flex items-center justify-between text-[11px] text-slate-400">
+                            <div className="flex items-center gap-1.5">
+                              <span>Tables:</span>
+                              {resp.tables_used.map((tbl, i) => (
+                                <span
+                                  key={i}
+                                  className="px-1.5 py-0.2 rounded bg-slate-800 text-indigo-300 font-mono text-[10px]"
+                                >
+                                  {tbl}
+                                </span>
+                              ))}
                             </div>
 
                             <button
                               onClick={() => copySqlToClipboard(resp.sql, msg.id)}
-                              className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
-                              title="Copy SQL"
+                              className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer text-[11px]"
                             >
                               {copiedSqlId === msg.id ? (
                                 <>
@@ -587,13 +563,13 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
                               ) : (
                                 <>
                                   <Copy className="w-3 h-3" />
-                                  <span>Copy SQL</span>
+                                  <span>Copy</span>
                                 </>
                               )}
                             </button>
                           </div>
 
-                          <pre className="overflow-x-auto text-xs text-indigo-200 leading-relaxed whitespace-pre-wrap p-2.5 rounded bg-slate-950/60 border border-slate-800/80">
+                          <pre className="overflow-x-auto text-xs text-indigo-200 leading-relaxed whitespace-pre-wrap p-2 rounded bg-slate-950/80 border border-slate-800">
                             {resp.sql}
                           </pre>
                         </div>
@@ -609,8 +585,8 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Box Footer */}
-      <div className="p-4 border-t border-slate-200 bg-white shrink-0">
+      {/* Input Form */}
+      <div className="p-3 border-t border-slate-200 bg-white shrink-0">
         <form
           onSubmit={e => {
             e.preventDefault();
@@ -618,30 +594,27 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
           }}
           className="flex items-center gap-2"
         >
-          <div className="relative flex-1">
-            <input
-              type="text"
-              value={inputQuestion}
-              onChange={e => setInputQuestion(e.target.value)}
-              placeholder="Ask anything (e.g. Which Java students missed 3+ classes and have EMIs due?)"
-              disabled={isSubmitting}
-              className="w-full px-4 py-3 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 pr-12 transition-all disabled:opacity-60"
-            />
-          </div>
+          <input
+            type="text"
+            value={inputQuestion}
+            onChange={e => setInputQuestion(e.target.value)}
+            placeholder="Ask Copilot (e.g. Which Java students missed 3+ classes and have EMIs due?)"
+            disabled={isSubmitting}
+            className="flex-1 px-3.5 py-2 text-xs sm:text-sm rounded-lg border border-slate-200 focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 disabled:opacity-60"
+          />
 
           <button
             type="submit"
             disabled={!inputQuestion.trim() || isSubmitting}
-            className="flex items-center justify-center p-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 transition-colors shadow-xs cursor-pointer"
+            className="flex items-center justify-center p-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 transition-colors cursor-pointer shrink-0"
             title="Ask Copilot"
           >
             <Send className="w-4 h-4" />
           </button>
         </form>
-
-        <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Read-only queries verified against active role schema boundaries.</span>
-          <span>Drafted messages require human approval before sending.</span>
+        <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400">
+          <span>Read-only queries strictly verified against role permissions.</span>
+          <span>Zero automated messaging without human sign-off.</span>
         </div>
       </div>
     </div>

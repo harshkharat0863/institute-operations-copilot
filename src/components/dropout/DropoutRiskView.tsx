@@ -86,77 +86,70 @@ export const DropoutRiskView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              Student Retention & Dropout Risk Radar
-            </h1>
-            <Badge variant="danger" size="sm" dot>
-              Early Warning AI
-            </Badge>
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Predictive intelligence analyzing multi-factor signals: attendance deceleration, consecutive absences, and payment friction.
-          </p>
-        </div>
+    <div className="space-y-5">
+      {/* Header */}
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+          Dropout Risk Radar
+        </h1>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Predictive operational intelligence identifying attendance deceleration and payment distress.
+        </p>
       </div>
 
-      {/* 3 Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+      {/* KPI Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Critical Risk Students
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Critical Risk
             </span>
-            <div className="p-2 rounded-xl bg-rose-50 text-rose-600">
+            <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
               <ShieldAlert className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-3 text-2xl font-bold text-rose-600">{criticalCount} Students</div>
-          <div className="mt-1 text-xs text-slate-400">&gt;85% dropout probability if unassisted</div>
+          <div className="mt-2 text-2xl font-bold text-rose-600">{criticalCount} Students</div>
+          <div className="mt-0.5 text-xs text-slate-400">Needs immediate 1-on-1 counselor outreach</div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Moderate / High Risk
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Moderate / High
             </span>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
+            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
               <TrendingDown className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-3 text-2xl font-bold text-slate-900">{highCount} Students</div>
-          <div className="mt-1 text-xs text-slate-400">Attendance dropped below 75% target</div>
+          <div className="mt-2 text-2xl font-bold text-slate-900">{highCount} Students</div>
+          <div className="mt-0.5 text-xs text-slate-400">Attendance trend dropped below 75% threshold</div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               Revenue at Risk
             </span>
-            <div className="p-2 rounded-xl bg-purple-50 text-purple-600">
+            <div className="p-1.5 rounded-lg bg-purple-50 text-purple-600">
               <IndianRupee className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-3 text-2xl font-bold text-slate-900">{formatINR(totalOverdueRisk)}</div>
-          <div className="mt-1 text-xs text-slate-400">Uncollected installments across at-risk cohort</div>
+          <div className="mt-2 text-2xl font-bold text-slate-900">{formatINR(totalOverdueRisk)}</div>
+          <div className="mt-0.5 text-xs text-slate-400">Outstanding installments across risk cohort</div>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/60">
           {(['all', 'critical', 'high', 'moderate'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setTierFilter(tab)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-all cursor-pointer ${
                 tierFilter === tab
-                  ? 'bg-white text-indigo-700 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               {tab}
@@ -164,71 +157,71 @@ export const DropoutRiskView: React.FC = () => {
           ))}
         </div>
 
-        <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+        <div className="relative w-full sm:w-72">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search student or cohort..."
-            className="w-full pl-10 pr-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-hidden focus:border-indigo-500"
           />
         </div>
       </div>
 
       {/* Risk Student Cards */}
       {loading ? (
-        <div className="p-12 text-center text-slate-400 text-sm bg-white rounded-2xl border border-slate-200">
-          <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-          Running multi-factor risk diagnostics...
+        <div className="p-12 text-center text-slate-400 text-sm bg-white rounded-xl border border-slate-200">
+          <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+          Running risk model diagnostics...
         </div>
       ) : filteredStudents.length === 0 ? (
-        <div className="p-12 text-center text-slate-500 text-sm bg-white rounded-2xl border border-slate-200">
-          No students matching selected risk tier.
+        <div className="p-12 text-center text-slate-500 text-sm bg-white rounded-xl border border-slate-200">
+          No students matching selected risk filter.
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {filteredStudents.map(student => (
             <div
               key={student.id}
-              className={`bg-white rounded-2xl border p-5 shadow-2xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 transition-all ${
+              className={`bg-white rounded-xl border p-4 shadow-2xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 transition-all ${
                 student.risk_tier === 'critical'
-                  ? 'border-rose-300 hover:border-rose-400 bg-rose-50/20'
-                  : 'border-slate-200 hover:border-slate-300'
+                  ? 'border-l-4 border-l-rose-500 border-slate-200'
+                  : 'border-l-4 border-l-amber-500 border-slate-200'
               }`}
             >
-              {/* Left Profile Info */}
-              <div className="space-y-2 flex-1">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-700 font-bold flex items-center justify-center text-sm">
+              {/* Profile and Signals */}
+              <div className="space-y-2 flex-1 min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-semibold flex items-center justify-center text-xs shrink-0">
                     {student.student_name.charAt(0)}
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-slate-900 text-sm">
                         {student.student_name}
                       </span>
                       <Badge variant={tierBadgeVariants[student.risk_tier]} size="sm">
-                        {student.risk_tier.toUpperCase()} RISK ({student.risk_score}%)
+                        {student.risk_tier.toUpperCase()} ({student.risk_score}%)
                       </Badge>
                       {student.intervention_status !== 'none' && (
-                        <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                        <span className="text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded">
                           ✓ {student.intervention_status.replace('_', ' ')}
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      {student.batch_name} • {student.course_name}
+                    <div className="text-[11px] text-slate-400">
+                      {student.batch_name} · {student.course_name}
                     </div>
                   </div>
                 </div>
 
-                {/* Risk Reasons List */}
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Diagnostic Signals
+                {/* Signals */}
+                <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700 space-y-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                    Diagnostic Signals:
                   </span>
-                  <ul className="text-xs text-slate-700 space-y-0.5 list-disc list-inside">
+                  <ul className="space-y-0.5 list-disc list-inside text-[11px] text-slate-600">
                     {student.reasons.map((r, idx) => (
                       <li key={idx} className="leading-snug">
                         {r}
@@ -238,46 +231,43 @@ export const DropoutRiskView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Right Side Metrics & Interventions */}
-              <div className="w-full lg:w-80 shrink-0 space-y-3 pt-3 lg:pt-0 lg:border-l lg:border-slate-100 lg:pl-5">
+              {/* Metrics & Actions */}
+              <div className="w-full lg:w-72 shrink-0 space-y-2.5 pt-2 lg:pt-0 lg:border-l lg:border-slate-100 lg:pl-4">
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
-                    <span className="text-slate-400 block text-[10px]">ATTENDANCE</span>
-                    <span className="font-bold text-slate-900">{student.attendance_rate}%</span>
+                    <span className="text-slate-400 block text-[10px] font-medium">ATTENDANCE</span>
+                    <span className="font-semibold text-slate-900">{student.attendance_rate}%</span>
                   </div>
                   <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
-                    <span className="text-slate-400 block text-[10px]">OVERDUE EMIS</span>
-                    <span className="font-bold text-rose-600">{formatINR(student.total_overdue_amount)}</span>
+                    <span className="text-slate-400 block text-[10px] font-medium">OVERDUE</span>
+                    <span className="font-semibold text-rose-600">{formatINR(student.total_overdue_amount)}</span>
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Intervention Actions
-                  </span>
                   <div className="grid grid-cols-2 gap-1.5">
                     <button
                       onClick={() => handleIntervention(student, 'counseling_scheduled')}
-                      className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                      className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
                     >
-                      <PhoneCall className="w-3.5 h-3.5" />
-                      Book Counseling
+                      <PhoneCall className="w-3 h-3" />
+                      Counseling
                     </button>
 
                     <button
                       onClick={() => handleIntervention(student, 'whatsapp_sent')}
-                      className="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-semibold text-xs flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                      className="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-medium text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
                     >
-                      <Send className="w-3.5 h-3.5 text-emerald-700" />
-                      WhatsApp Alert
+                      <Send className="w-3 h-3 text-emerald-700" />
+                      WhatsApp
                     </button>
                   </div>
 
                   <button
                     onClick={() => handleIntervention(student, 'plan_restructured')}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs transition-colors cursor-pointer"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs cursor-pointer transition-colors"
                   >
-                    Restructure EMI Plan (Installment Split)
+                    Restructure Installment Schedule
                   </button>
                 </div>
               </div>
