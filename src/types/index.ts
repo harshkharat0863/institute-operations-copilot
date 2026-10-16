@@ -153,6 +153,9 @@ export interface TimetableSession {
   end: string;   // e.g. "12:00"
   mode: BatchMode;
   color_code?: string;
+  enrolled_count?: number;
+  room_capacity?: number;
+  online_seat_limit?: number;
 }
 
 export interface TimetableChange {
