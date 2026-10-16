@@ -275,6 +275,38 @@ export interface DropoutRiskStudent {
   last_login_days_ago: number;
   reasons: string[];
   recommended_intervention: string;
-  intervention_status: 'none' | 'counseling_scheduled' | 'whatsapp_sent' | 'plan_restructured';
+}
+
+export interface FailureChainEvidence {
+  dimension: 'attendance' | 'assessment' | 'fees' | 'academic';
+  department: 'Academic Operations' | 'Instructional Staff' | 'Accounts & Finance' | 'LMS / Lab Telemetry';
+  indicator: string;
+  metric: string;
+  severity: 'critical' | 'warning' | 'normal';
+  timestamp: string;
+  verified_source: string;
+}
+
+export interface CoordinatedSupportPlan {
+  counselor_action: string;
+  trainer_action: string;
+  accounts_action: string;
+  unified_message: string;
+  follow_up_date: string;
+}
+
+export interface FailureChainStudent {
+  id: string;
+  student_id: string;
+  student_name: string;
+  phone_masked: string;
+  batch_name: string;
+  course_name: string;
+  chain_severity: 'critical_cascade' | 'compound_risk' | 'early_friction';
+  correlation_score: number; // 0 to 100
+  isolated_alert_flaw: string; // Explains what single-department alert would have missed
+  evidence_chain: FailureChainEvidence[];
+  coordinated_plan: CoordinatedSupportPlan;
+  resolution_status: 'unaddressed' | 'plan_staged' | 'in_progress' | 'stabilized';
 }
 

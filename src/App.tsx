@@ -24,6 +24,7 @@ import { FeeRecognitionView } from './components/fees/FeeRecognitionView';
 import { CertificationsView } from './components/certifications/CertificationsView';
 import { RecordingsView } from './components/recordings/RecordingsView';
 import { DropoutRiskView } from './components/dropout/DropoutRiskView';
+import { FailureChainView } from './components/failure_chain/FailureChainView';
 import { Info, BookOpen, Layers, Download } from 'lucide-react';
 import { Modal } from './components/common/Modal';
 
@@ -100,6 +101,8 @@ function MainApp() {
         return <RecordingsView />;
       case 'dropout_risk':
         return <DropoutRiskView />;
+      case 'failure_chain':
+        return <FailureChainView />;
       case 'approvals':
         return <ApprovalsView />;
       case 'timetable':

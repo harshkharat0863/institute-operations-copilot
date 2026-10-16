@@ -889,10 +889,243 @@ class Repository:
             }
         ]
 
-    async def intervene_dropout_risk(self, dr_id: str, action: str) -> dict:
+    async def get_failure_chains(self) -> List[dict]:
+        return [
+            {
+                "id": "fc_1",
+                "student_id": "std_java_003",
+                "student_name": "Sneha Patil",
+                "phone_masked": "98******45",
+                "batch_name": "Java Fullstack - Batch B",
+                "course_name": "Java Fullstack Masterclass",
+                "chain_severity": "critical_cascade",
+                "correlation_score": 94,
+                "isolated_alert_flaw": "Accounts issued an automated fee payment reminder, but missed that Sneha failed 2 Java OOP sprints and missed 5 lectures following family emergency.",
+                "evidence_chain": [
+                    {
+                        "dimension": "attendance",
+                        "department": "Academic Operations",
+                        "indicator": "Severe Attendance Deceleration",
+                        "metric": "5 missed classes in 30 days (61% rate)",
+                        "severity": "critical",
+                        "timestamp": "2026-10-14 09:30 AM",
+                        "verified_source": "Biometric Lab RFID Gate B"
+                    },
+                    {
+                        "dimension": "assessment",
+                        "department": "Instructional Staff",
+                        "indicator": "Unsubmitted Programming Capstone",
+                        "metric": "Sprint 3: Microservices Design - Overdue by 8 days",
+                        "severity": "critical",
+                        "timestamp": "2026-10-15 05:00 PM",
+                        "verified_source": "GitHub Classroom Autograder"
+                    },
+                    {
+                        "dimension": "fees",
+                        "department": "Accounts & Finance",
+                        "indicator": "Overdue Installment Friction",
+                        "metric": "EMI #2 (₹6,500) unpaid for 11 days",
+                        "severity": "warning",
+                        "timestamp": "2026-10-16 11:15 AM",
+                        "verified_source": "Razorpay Settlement Feed"
+                    },
+                    {
+                        "dimension": "academic",
+                        "department": "LMS / Lab Telemetry",
+                        "indicator": "Zero Portal Login Velocity",
+                        "metric": "0 compiler executions logged in last 6 days",
+                        "severity": "warning",
+                        "timestamp": "2026-10-16 08:00 PM",
+                        "verified_source": "Docker Sandbox Container Runner"
+                    }
+                ],
+                "coordinated_plan": {
+                    "counselor_action": "Schedule empathetic 1-on-1 check-in to address non-academic stress and adjust pacing.",
+                    "trainer_action": "Assign Priya Sundaram for a 45-min code debugging review session on Microservices.",
+                    "accounts_action": "Pause aggressive automated WhatsApp payment notices; restructure EMI into two micro-tranches.",
+                    "unified_message": "Hi Sneha, Priya ma'am and the team noticed you've had a tough couple of weeks with Sprint 3. We've set aside a special 1-on-1 tutoring slot tomorrow at 3 PM and deferred your fee schedule. Let's get you back on track!",
+                    "follow_up_date": "2026-10-19"
+                },
+                "resolution_status": "unaddressed"
+            },
+            {
+                "id": "fc_2",
+                "student_id": "std_java_001",
+                "student_name": "Aarav Sharma",
+                "phone_masked": "98******21",
+                "batch_name": "Java Fullstack - Batch A",
+                "course_name": "Java Fullstack Masterclass",
+                "chain_severity": "compound_risk",
+                "correlation_score": 86,
+                "isolated_alert_flaw": "Trainer noticed low quiz marks (42%), while counselor assumed attendance (68%) was temporary sickness. Nobody tied it to the pending EMI notice.",
+                "evidence_chain": [
+                    {
+                        "dimension": "assessment",
+                        "department": "Instructional Staff",
+                        "indicator": "Declining Quiz Scores",
+                        "metric": "Spring Core Test: 42% (Class Average: 78%)",
+                        "severity": "critical",
+                        "timestamp": "2026-10-12 04:30 PM",
+                        "verified_source": "Moodle Assessment LMS"
+                    },
+                    {
+                        "dimension": "attendance",
+                        "department": "Academic Operations",
+                        "indicator": "Chronic Lab Tardiness",
+                        "metric": "4 absences + 3 late arrivals (>25 mins)",
+                        "severity": "warning",
+                        "timestamp": "2026-10-14 10:15 AM",
+                        "verified_source": "Kiosk Biometric Log"
+                    },
+                    {
+                        "dimension": "fees",
+                        "department": "Accounts & Finance",
+                        "indicator": "Imminent EMI Due Date",
+                        "metric": "Installment #3 of ₹6,500 due in 2 days",
+                        "severity": "warning",
+                        "timestamp": "2026-10-16 09:00 AM",
+                        "verified_source": "Student Ledger ERP"
+                    },
+                    {
+                        "dimension": "academic",
+                        "department": "LMS / Lab Telemetry",
+                        "indicator": "Incomplete Recorded Lecture Reviews",
+                        "metric": "Only 12 mins watched of 2 archived sessions",
+                        "severity": "normal",
+                        "timestamp": "2026-10-15 09:40 PM",
+                        "verified_source": "HLS Video Streaming CDN"
+                    }
+                ],
+                "coordinated_plan": {
+                    "counselor_action": "Conduct phone consultation to assess academic confidence and study environment.",
+                    "trainer_action": "Provide peer-buddy assignment pairing with top-performing batchmate.",
+                    "accounts_action": "Offer zero-penalty 14-day payment extension conditional on attendance stabilization.",
+                    "unified_message": "Hello Aarav, your mentors reviewed your recent Spring Core coursework. We have paired you with a peer study group and arranged an extension on your upcoming installment so you can focus 100% on labs.",
+                    "follow_up_date": "2026-10-20"
+                },
+                "resolution_status": "unaddressed"
+            },
+            {
+                "id": "fc_3",
+                "student_id": "std_py_005",
+                "student_name": "Rohan Gupta",
+                "phone_masked": "98******77",
+                "batch_name": "Python Data Eng - Batch A",
+                "course_name": "Python Data Engineering & ML",
+                "chain_severity": "compound_risk",
+                "correlation_score": 78,
+                "isolated_alert_flaw": "Accounts flagged unpaid ₹7,000 EMI; trainer noticed missed PySpark lectures. Neither realized student had laptop hardware failure.",
+                "evidence_chain": [
+                    {
+                        "dimension": "attendance",
+                        "department": "Academic Operations",
+                        "indicator": "WebRTC Online Dropouts",
+                        "metric": "Joined only 15 mins of last 3 live streams",
+                        "severity": "warning",
+                        "timestamp": "2026-10-13 11:45 AM",
+                        "verified_source": "LiveKit WebRTC Signaling Server"
+                    },
+                    {
+                        "dimension": "assessment",
+                        "department": "Instructional Staff",
+                        "indicator": "Missing PySpark ETL Pipeline Assignment",
+                        "metric": "Zero commits to assignment repository",
+                        "severity": "warning",
+                        "timestamp": "2026-10-14 06:00 PM",
+                        "verified_source": "GitLab Webhook Telemetry"
+                    },
+                    {
+                        "dimension": "fees",
+                        "department": "Accounts & Finance",
+                        "indicator": "Overdue Installment",
+                        "metric": "₹7,000 due Oct 10 (7 days overdue)",
+                        "severity": "critical",
+                        "timestamp": "2026-10-15 10:00 AM",
+                        "verified_source": "Accounts Receivable Ledger"
+                    },
+                    {
+                        "dimension": "academic",
+                        "department": "LMS / Lab Telemetry",
+                        "indicator": "Browser Environment Disconnects",
+                        "metric": "8 crashed cloud terminal sessions recorded",
+                        "severity": "normal",
+                        "timestamp": "2026-10-14 02:20 PM",
+                        "verified_source": "JupyterHub Telemetry Pod"
+                    }
+                ],
+                "coordinated_plan": {
+                    "counselor_action": "Verify hardware access; allocate institute physical campus lab workstation slot.",
+                    "trainer_action": "Host quick 20-minute catchup on PySpark Docker container setup.",
+                    "accounts_action": "Accept UPI split payment (₹3,500 now, ₹3,500 end of month).",
+                    "unified_message": "Hi Rohan, we noticed connectivity disruptions during the PySpark modules. A dedicated terminal is reserved for you at Campus Lab 1, and your fee installment has been split into 2 smaller installments. See you in class!",
+                    "follow_up_date": "2026-10-21"
+                },
+                "resolution_status": "unaddressed"
+            },
+            {
+                "id": "fc_4",
+                "student_id": "std_ds_008",
+                "student_name": "Meera Nair",
+                "phone_masked": "98******89",
+                "batch_name": "Data Science & GenAI - Batch A",
+                "course_name": "Data Science & Generative AI",
+                "chain_severity": "early_friction",
+                "correlation_score": 64,
+                "isolated_alert_flaw": "Isolated attendance score looked acceptable (76%), but combined with sudden drop in quiz percentile and first-time fee delay, signals imminent burnout.",
+                "evidence_chain": [
+                    {
+                        "dimension": "assessment",
+                        "department": "Instructional Staff",
+                        "indicator": "First Sub-Threshold Test",
+                        "metric": "Neural Networks Math Quiz: 54% (prior tests: 88%)",
+                        "severity": "warning",
+                        "timestamp": "2026-10-15 03:00 PM",
+                        "verified_source": "Jupyter Notebook Grading Harness"
+                    },
+                    {
+                        "dimension": "attendance",
+                        "department": "Academic Operations",
+                        "indicator": "Absent for Difficult Topic",
+                        "metric": "Missed backpropagation and loss optimization session",
+                        "severity": "warning",
+                        "timestamp": "2026-10-16 10:00 AM",
+                        "verified_source": "Biometric Turnstile"
+                    },
+                    {
+                        "dimension": "fees",
+                        "department": "Accounts & Finance",
+                        "indicator": "Pending EMI Due Tomorrow",
+                        "metric": "₹8,000 installment due Oct 18",
+                        "severity": "normal",
+                        "timestamp": "2026-10-16 12:00 PM",
+                        "verified_source": "Ledger Automation"
+                    },
+                    {
+                        "dimension": "academic",
+                        "department": "LMS / Lab Telemetry",
+                        "indicator": "Late Night Platform Access Pattern",
+                        "metric": "Logins at 2:30 AM indicating study friction",
+                        "severity": "normal",
+                        "timestamp": "2026-10-16 02:40 AM",
+                        "verified_source": "Auth0 Access Audit"
+                    }
+                ],
+                "coordinated_plan": {
+                    "counselor_action": "Check on student wellbeing and prevent academic overwhelm.",
+                    "trainer_action": "Provide curated visual cheat-sheet and 1-on-1 TA support on Backpropagation.",
+                    "accounts_action": "Standard reminder with automatic grace window option.",
+                    "unified_message": "Hi Meera, Dr. Amit Patel noticed Neural Networks can be challenging in week 6. We have shared a step-by-step visual guide and scheduled an optional TA Q&A session this Saturday. You're doing great!",
+                    "follow_up_date": "2026-10-22"
+                },
+                "resolution_status": "unaddressed"
+            }
+        ]
+
+    async def update_failure_chain_plan(self, chain_id: str, plan_status: str, notes: Optional[str] = None) -> dict:
         return {
-            "id": dr_id,
-            "intervention_status": action,
+            "id": chain_id,
+            "resolution_status": plan_status,
+            "notes": notes or "Coordinated plan updated across Counselor, Trainer and Accounts.",
             "status": "updated"
         }
 

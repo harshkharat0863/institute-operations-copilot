@@ -284,6 +284,19 @@ async def get_dropout_risk(user: dict = Depends(require_roles("owner", "counselo
 async def intervene_dropout_risk(student_id: str, req: DropoutInterventionRequest, user: dict = Depends(require_roles("owner", "counselor"))):
     return await repo.intervene_dropout_risk(student_id, req.action_type)
 
+# -------------------------------------------------------------
+# 16. THE HIDDEN STUDENT FAILURE CHAIN
+# -------------------------------------------------------------
+from backend.models import FailureChainInterventionRequest
+
+@app.get("/students/failure-chains")
+async def get_failure_chains(user: dict = Depends(require_roles("owner", "counselor", "trainer", "accounts"))):
+    return await repo.get_failure_chains()
+
+@app.post("/students/failure-chains/{chain_id}/plan")
+async def update_failure_chain_plan(chain_id: str, req: FailureChainInterventionRequest, user: dict = Depends(require_roles("owner", "counselor"))):
+    return await repo.update_failure_chain_plan(chain_id, req.plan_status, req.notes)
+
 # Health check
 @app.get("/health")
 async def health():

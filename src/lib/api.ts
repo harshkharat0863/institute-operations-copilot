@@ -16,6 +16,7 @@ import {
   Certificate,
   ClassRecording,
   DropoutRiskStudent,
+  FailureChainStudent,
 } from '../types';
 import { decodeJwt, generateMockJwt } from './jwt';
 import {
@@ -40,6 +41,7 @@ import {
   CERTIFICATES_DATA,
   RECORDINGS_DATA,
   DROPOUT_RISK_DATA,
+  FAILURE_CHAINS_DATA,
 } from './mock/data';
 import { runRedTeamSuite } from './mock/redteam';
 import { generateTimetableFresh, getTimetable, replanTimetable } from './mock/timetable';
@@ -53,6 +55,7 @@ let mockReconciliationsStore: PaymentReconciliation[] = JSON.parse(JSON.stringif
 let mockCertificatesStore: Certificate[] = JSON.parse(JSON.stringify(CERTIFICATES_DATA));
 let mockRecordingsStore: ClassRecording[] = JSON.parse(JSON.stringify(RECORDINGS_DATA));
 let mockDropoutRiskStore: DropoutRiskStudent[] = JSON.parse(JSON.stringify(DROPOUT_RISK_DATA));
+let mockFailureChainsStore: FailureChainStudent[] = JSON.parse(JSON.stringify(FAILURE_CHAINS_DATA));
 
 /**
  * Determine if mock mode is active.
@@ -795,6 +798,42 @@ export const api = {
     return apiFetch<DropoutRiskStudent>(`/students/dropout-risk/${id}/intervene`, {
       method: 'POST',
       body: JSON.stringify({ action_type: actionType }),
+    });
+  },
+
+  // 16. The Hidden Student Failure Chain
+  async getFailureChains(): Promise<FailureChainStudent[]> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 150));
+      return [...mockFailureChainsStore];
+    }
+    return apiFetch<FailureChainStudent[]>('/students/failure-chains');
+  },
+
+  async updateFailureChainPlan(
+    id: string,
+    planStatus: 'plan_staged' | 'in_progress' | 'stabilized',
+    notes?: string
+  ): Promise<FailureChainStudent> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 200));
+      const chain = mockFailureChainsStore.find(c => c.id === id);
+      if (!chain) throw new Error('Failure chain correlation profile not found');
+      chain.resolution_status = planStatus;
+      recordAuditLog({
+        user_name: 'Operations Copilot',
+        role: 'counselor',
+        action: 'failure_chain_orchestration',
+        target: chain.student_name,
+        details: `Updated coordinated multi-department plan to '${planStatus}' for ${chain.student_name} (Correlation score: ${chain.correlation_score}%).`,
+        ip_address: '127.0.0.1',
+        status: 'success',
+      });
+      return { ...chain };
+    }
+    return apiFetch<FailureChainStudent>(`/students/failure-chains/${id}/plan`, {
+      method: 'POST',
+      body: JSON.stringify({ plan_status: planStatus, notes }),
     });
   },
 };

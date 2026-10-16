@@ -424,14 +424,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             </div>
           </div>
         </div>
-        {role !== 'trainer' && (
+        <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={() => onNavigate('copilot')}
-            className="shrink-0 px-3.5 py-2 rounded-xl bg-amber-700 text-white text-xs font-semibold hover:bg-amber-800 transition-colors"
+            onClick={() => onNavigate('failure_chain')}
+            className="px-3.5 py-2 rounded-xl bg-rose-700 text-white text-xs font-semibold hover:bg-rose-800 transition-colors shadow-2xs"
           >
-            Run Java Copilot Analysis
+            Inspect Failure Chains
           </button>
-        )}
+          {role !== 'trainer' && (
+            <button
+              onClick={() => onNavigate('copilot')}
+              className="px-3.5 py-2 rounded-xl bg-amber-700 text-white text-xs font-semibold hover:bg-amber-800 transition-colors shadow-2xs"
+            >
+              Run Java Copilot
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

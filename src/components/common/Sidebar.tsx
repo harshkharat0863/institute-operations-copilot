@@ -16,6 +16,7 @@ import {
   Award,
   Video,
   ShieldAlert,
+  Link2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
@@ -46,6 +47,15 @@ export const ALL_NAV_ITEMS: NavItemConfig[] = [
     allowedRoles: ['owner', 'counselor', 'trainer'],
     badge: 'AI',
     badgeVariant: 'info',
+    group: 'Intelligence',
+  },
+  {
+    id: 'failure_chain',
+    label: 'Failure Chain',
+    icon: Link2,
+    allowedRoles: ['owner', 'counselor', 'trainer', 'accounts'],
+    badge: 'Correlated',
+    badgeVariant: 'danger',
     group: 'Intelligence',
   },
   {

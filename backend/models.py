@@ -273,3 +273,37 @@ class DropoutRiskStudent(BaseModel):
 class DropoutInterventionRequest(BaseModel):
     action_type: Literal['counseling_scheduled', 'whatsapp_sent', 'plan_restructured']
 
+class FailureChainEvidence(BaseModel):
+    dimension: Literal['attendance', 'assessment', 'fees', 'academic']
+    department: str
+    indicator: str
+    metric: str
+    severity: Literal['critical', 'warning', 'normal']
+    timestamp: str
+    verified_source: str
+
+class CoordinatedSupportPlan(BaseModel):
+    counselor_action: str
+    trainer_action: str
+    accounts_action: str
+    unified_message: str
+    follow_up_date: str
+
+class FailureChainStudent(BaseModel):
+    id: str
+    student_id: str
+    student_name: str
+    phone_masked: str
+    batch_name: str
+    course_name: str
+    chain_severity: Literal['critical_cascade', 'compound_risk', 'early_friction']
+    correlation_score: int
+    isolated_alert_flaw: str
+    evidence_chain: List[FailureChainEvidence]
+    coordinated_plan: CoordinatedSupportPlan
+    resolution_status: Literal['unaddressed', 'plan_staged', 'in_progress', 'stabilized']
+
+class FailureChainInterventionRequest(BaseModel):
+    plan_status: Literal['plan_staged', 'in_progress', 'stabilized']
+    notes: Optional[str] = None
+
