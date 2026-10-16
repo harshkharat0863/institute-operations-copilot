@@ -10,6 +10,8 @@ import {
   Sparkles,
   DollarSign,
   Download,
+  Bot,
+  Calendar,
 } from 'lucide-react';
 import {
   LineChart,
