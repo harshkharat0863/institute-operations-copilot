@@ -1,29 +1,85 @@
 import React, { useState } from 'react';
 import {
+  Sparkles,
   ShieldCheck,
-  Lock,
+  Calendar,
+  Users,
+  GraduationCap,
+  Receipt,
+  Building2,
   Mail,
+  Lock,
   ArrowRight,
-  ChevronDown,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { DEMO_USERS } from '../../lib/mock/data';
 import { UserRole } from '../../types';
 
-const ROLES: { value: UserRole; label: string; emoji: string; name: string }[] = [
-  { value: 'owner',     label: 'Owner & Director',    emoji: '👑', name: 'Vikramaditya Mehta' },
-  { value: 'counselor', label: 'Academic Counselor',  emoji: '🎓', name: 'Anjali Sharma'       },
-  { value: 'trainer',   label: 'Faculty / Trainer',   emoji: '📚', name: 'Priya Sundaram'      },
-  { value: 'accounts',  label: 'Accounts Officer',    emoji: '💳', name: 'Suresh Iyer'         },
-];
+interface RoleCard {
+  role: UserRole;
+  title: string;
+  subtitle: string;
+  icon: React.ElementType;
+  bgClass: string;
+  borderClass: string;
+  textClass: string;
+  subtextClass: string;
+  arrowClass: string;
+  activeRing: string;
+}
 
-const roleInfo: Record<UserRole, string> = {
-  owner:     'Complete administrative access — financials, audit logs & red-team security.',
-  counselor: 'Student admissions, attendance logs and WhatsApp outbox follow-ups.',
-  trainer:   'Teaching timetable & class attendance. Financials strictly hidden.',
-  accounts:  'Fee collections, EMI installments, ledger settlement & payment approvals.',
-};
+const ROLE_CARDS: RoleCard[] = [
+  {
+    role: 'owner',
+    title: '1. Owner',
+    subtitle: 'Full System & Red-Team',
+    icon: Building2,
+    bgClass: 'bg-purple-50/70 hover:bg-purple-50',
+    borderClass: 'border-purple-200/90',
+    textClass: 'text-purple-950',
+    subtextClass: 'text-purple-700/80',
+    arrowClass: 'text-purple-500',
+    activeRing: 'ring-2 ring-purple-500 border-purple-400 bg-purple-50',
+  },
+  {
+    role: 'counselor',
+    title: '2. Counselor',
+    subtitle: 'Students, Batches & Copilot',
+    icon: Users,
+    bgClass: 'bg-sky-50/70 hover:bg-sky-50',
+    borderClass: 'border-sky-200/90',
+    textClass: 'text-sky-950',
+    subtextClass: 'text-sky-700/80',
+    arrowClass: 'text-sky-500',
+    activeRing: 'ring-2 ring-sky-500 border-sky-400 bg-sky-50',
+  },
+  {
+    role: 'trainer',
+    title: '3. Trainer',
+    subtitle: 'Schedule & Attendance',
+    icon: GraduationCap,
+    bgClass: 'bg-emerald-50/70 hover:bg-emerald-50',
+    borderClass: 'border-emerald-200/90',
+    textClass: 'text-emerald-950',
+    subtextClass: 'text-emerald-700/80',
+    arrowClass: 'text-emerald-500',
+    activeRing: 'ring-2 ring-emerald-500 border-emerald-400 bg-emerald-50',
+  },
+  {
+    role: 'accounts',
+    title: '4. Accounts',
+    subtitle: 'Fees, EMIs & Approvals',
+    icon: Receipt,
+    bgClass: 'bg-amber-50/70 hover:bg-amber-50',
+    borderClass: 'border-amber-200/90',
+    textClass: 'text-amber-950',
+    subtextClass: 'text-amber-700/80',
+    arrowClass: 'text-amber-500',
+    activeRing: 'ring-2 ring-amber-500 border-amber-400 bg-amber-50',
+  },
+];
 
 export const LoginView: React.FC = () => {
   const { login, isLoading } = useAuth();
@@ -31,156 +87,206 @@ export const LoginView: React.FC = () => {
   const [selectedRole, setSelectedRole] = useState<UserRole>('owner');
   const [email, setEmail] = useState('owner@institute.org');
   const [password, setPassword] = useState('password123');
-  const [remember, setRemember] = useState(true);
 
-  const handleRoleChange = (newRole: UserRole) => {
-    setSelectedRole(newRole);
-    const demo = DEMO_USERS[newRole];
-    if (demo) setEmail(demo.email);
+  const handleSelectRole = (role: UserRole) => {
+    setSelectedRole(role);
+    const demo = DEMO_USERS[role];
+    if (demo) {
+      setEmail(demo.email);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await login(email, selectedRole);
-      showToast('Welcome back! Signed in successfully.', 'success');
+      showToast(`Signed in as ${selectedRole.toUpperCase()} successfully`, 'success');
     } catch (err: any) {
       showToast(err.message || 'Authentication failed', 'error');
     }
   };
 
-  const currentRole = ROLES.find(r => r.value === selectedRole)!;
-
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center px-4 py-10">
-      <div className="w-full max-w-[420px]">
-
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-
-          {/* Card top section */}
-          <div className="px-8 pt-10 pb-6 text-center">
-            {/* App Icon */}
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white text-2xl font-bold shadow-md shadow-indigo-200 mb-5 select-none">
-              I
-            </div>
-            <h1 className="text-[1.6rem] font-bold text-slate-900 tracking-tight leading-tight">
-              Welcome back
-            </h1>
-            <p className="text-sm text-slate-500 mt-1.5">
-              Sign in to access your operations workspace
-            </p>
-          </div>
-
-          {/* Form section */}
-          <form onSubmit={handleSubmit} className="px-8 pb-8 space-y-5">
-
-            {/* Role selector */}
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-widest mb-2">
-                Portal / Role
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedRole}
-                  onChange={e => handleRoleChange(e.target.value as UserRole)}
-                  className="w-full appearance-none pl-4 pr-10 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none transition cursor-pointer"
-                >
-                  {ROLES.map(r => (
-                    <option key={r.value} value={r.value}>
-                      {r.emoji}  {r.label} — {r.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+    <div className="min-h-screen bg-[#fcfbf8] flex items-center justify-center p-4 sm:p-6 lg:p-8 font-sans">
+      {/* Main Container Card matching reference */}
+      <div className="w-full max-w-5xl bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200/90 overflow-hidden flex flex-col md:flex-row">
+        
+        {/* LEFT PANEL (Dark Slate/Navy) */}
+        <div className="w-full md:w-[42%] bg-[#131b26] p-7 sm:p-9 lg:p-10 flex flex-col justify-between text-white relative">
+          <div>
+            {/* Logo and Brand */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/30">
+                <Sparkles className="w-5 h-5 text-indigo-100" />
               </div>
-              {/* Role description */}
-              <div className="mt-2 px-3 py-2.5 rounded-xl bg-indigo-50 border border-indigo-100 flex items-start gap-2">
-                <ShieldCheck className="w-4 h-4 text-indigo-500 shrink-0 mt-[1px]" />
-                <p className="text-[11.5px] text-slate-600 leading-snug">
-                  {roleInfo[selectedRole]}
+              <div>
+                <h2 className="text-lg font-bold text-white tracking-tight leading-tight">
+                  InstituteOps
+                </h2>
+                <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                  ENTERPRISE COPILOT
                 </p>
               </div>
             </div>
 
-            {/* Email */}
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-widest mb-2">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="w-[15px] h-[15px] text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="you@institute.org"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none transition"
-                />
-              </div>
+            {/* Main Headline */}
+            <div className="mt-8">
+              <h1 className="text-2xl sm:text-[1.7rem] font-bold text-white leading-snug tracking-tight">
+                AI Operations Desk for Coaching Institutes
+              </h1>
+              <p className="text-xs text-slate-400 leading-relaxed mt-3">
+                Role-governed intelligence: automated timetable constraint solver, zero-trust PII masking, and human-in-the-loop WhatsApp reminders.
+              </p>
             </div>
 
-            {/* Password */}
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-widest mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="w-[15px] h-[15px] text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none transition"
-                />
+            {/* 3 Feature Highlights */}
+            <div className="mt-7 space-y-2.5">
+              <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 text-xs font-medium text-slate-200">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>SafeQuery™ AST Defense & RLS</span>
               </div>
-              <div className="flex items-center justify-between mt-2.5">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={e => setRemember(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded text-indigo-600 border-slate-300 cursor-pointer focus:ring-indigo-400"
-                  />
-                  <span className="text-xs text-slate-500">Remember me</span>
-                </label>
-                <button
-                  type="button"
-                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition"
-                >
-                  Forgot password?
-                </button>
+
+              <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 text-xs font-medium text-slate-200">
+                <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span>Drag-and-Drop Timetable Solver</span>
+              </div>
+
+              <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 text-xs font-medium text-slate-200">
+                <Users className="w-4 h-4 text-purple-400 shrink-0" />
+                <span>Human-in-the-Loop Approvals</span>
               </div>
             </div>
+          </div>
 
-            {/* Sign In button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 py-3 px-5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-[0.985] shadow-sm transition-all cursor-pointer disabled:opacity-60 mt-1"
-            >
-              {isLoading ? 'Verifying…' : 'Sign In'}
-              <ArrowRight className="w-4 h-4" />
-            </button>
-
-          </form>
-
-          {/* Security footer inside card */}
-          <div className="border-t border-slate-100 px-8 py-4 flex items-center gap-2 bg-slate-50/60">
-            <ShieldCheck className="w-4 h-4 text-slate-400 shrink-0" />
-            <p className="text-[11.5px] text-slate-500 leading-snug">
-              Session is encrypted end-to-end via Supabase PostgreSQL. Staff-only portal.
-            </p>
+          {/* Bottom Supabase Status */}
+          <div className="mt-8 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+            <span>Supabase PostgreSQL</span>
+            <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Connected</span>
+            </div>
           </div>
         </div>
 
-        {/* Below-card copyright */}
-        <p className="text-center text-xs text-slate-400 mt-5">
-          © 2026 Institute Operations Desk · Internal Staff Portal
-        </p>
+        {/* RIGHT PANEL (Clean White Form & Role Cards) */}
+        <div className="w-full md:w-[58%] p-7 sm:p-9 lg:p-10 flex flex-col justify-between bg-white">
+          <div>
+            {/* Top Header */}
+            <div className="flex items-start justify-between gap-3 mb-5">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Quick One-Click Sign In
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pick any role to test its specific access level
+                </p>
+              </div>
+              <span className="shrink-0 text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-full">
+                4 Roles
+              </span>
+            </div>
+
+            {/* 4 Role Selector Cards (2x2 Grid) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {ROLE_CARDS.map(item => {
+                const isSelected = selectedRole === item.role;
+                const Icon = item.icon;
+
+                return (
+                  <button
+                    key={item.role}
+                    type="button"
+                    onClick={() => handleSelectRole(item.role)}
+                    className={`rounded-xl p-3 border text-left transition-all cursor-pointer ${
+                      item.bgClass
+                    } ${
+                      isSelected ? item.activeRing : item.borderClass
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon className={`w-4 h-4 ${item.arrowClass}`} />
+                        <span className={`text-xs font-bold ${item.textClass}`}>
+                          {item.title}
+                        </span>
+                      </div>
+                      <ArrowRight className={`w-3.5 h-3.5 ${item.arrowClass}`} />
+                    </div>
+                    <div className={`text-[11px] font-medium mt-1 pl-6 ${item.subtextClass}`}>
+                      {item.subtitle}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Divider */}
+            <div className="relative my-5">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200" />
+              </div>
+              <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest text-slate-400">
+                <span className="bg-white px-3">OR SIGN IN WITH EMAIL</span>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-3.5">
+              {/* EMAIL */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  EMAIL ADDRESS
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="name@institute.org"
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 focus:outline-none transition-all placeholder:text-slate-400"
+                  />
+                </div>
+              </div>
+
+              {/* PASSWORD */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  PASSWORD
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••••"
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 focus:outline-none transition-all placeholder:text-slate-400"
+                  />
+                </div>
+              </div>
+
+              {/* Submit CTA Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] shadow-sm shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50 mt-2"
+              >
+                {isLoading ? 'Verifying Session...' : 'Sign In to Operations Console'}
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+
+          {/* Bottom Security Pill */}
+          <div className="mt-5 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center gap-2 text-[11.5px] text-slate-600">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Decoded JWT Clearance. Role strictly derived from verified token.</span>
+          </div>
+        </div>
+
       </div>
     </div>
   );
