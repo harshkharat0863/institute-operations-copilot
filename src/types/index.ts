@@ -109,6 +109,10 @@ export interface CopilotAskResponse {
   partial_explanation?: string;
   can_draft_reminders: boolean;
   generated_actions?: PendingActionDraft[];
+  operation?: string;
+  operation_payload?: Record<string, any>;
+  category?: 'attendance' | 'fees' | 'timetable' | 'risk_detection' | 'communication' | 'unsupported';
+  explanation_note?: string;
 }
 
 export interface PendingActionDraft {
