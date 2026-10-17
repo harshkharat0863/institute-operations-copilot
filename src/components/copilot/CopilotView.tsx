@@ -258,7 +258,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
                 Operations Copilot
               </h2>
               <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
-                SafeQuery™ AST
+                Read-Only AST
               </span>
             </div>
             <p className="text-xs text-slate-500">

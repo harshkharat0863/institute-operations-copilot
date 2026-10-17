@@ -143,7 +143,7 @@ export const LoginView: React.FC = () => {
             <div className="mt-7 space-y-2.5">
               <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 text-xs font-medium text-slate-200">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>SafeQuery™ AST Defense & RLS</span>
+                <span>Zero-Trust AST Defense & RLS</span>
               </div>
 
               <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 text-xs font-medium text-slate-200">

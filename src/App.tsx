@@ -161,7 +161,7 @@ function MainApp() {
               1. <strong>Decoded JWT Roles:</strong> Permissions never trust user inputs; roles are parsed strictly from the decoded JWT claims.<br />
               2. <strong>Zero-Trust PII Masking:</strong> Phone numbers are uniformly masked (e.g. <code className="font-mono">98******21</code>).<br />
               3. <strong>Mock-to-Production Toggle:</strong> Works out-of-the-box against realistic Indian dataset, then switches to live FastAPI via environment variable (<code className="font-mono">NEXT_PUBLIC_USE_MOCK=false</code> or in-app toggle).<br />
-              4. <strong>SafeQuery™ AST Guard:</strong> Direct SQL generation with role view schema boundaries and red-team tested defenses.
+              4. <strong>Zero-Trust Read-Only AST Guard:</strong> Direct SQL generation with role view schema boundaries and red-team tested defenses.
             </p>
           </div>
 

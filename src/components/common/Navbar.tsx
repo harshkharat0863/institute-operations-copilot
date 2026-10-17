@@ -8,7 +8,6 @@ import {
   Database,
   ExternalLink,
   Settings2,
-  Download,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -73,9 +72,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateScreen }) => {
             <span className="font-bold text-slate-900 text-sm tracking-tight">
               Institute Copilot
             </span>
-            <span className="hidden md:inline text-[10px] text-slate-400 font-medium ml-2">
-              v1.4 · SafeQuery™
-            </span>
           </div>
         </div>
 
@@ -109,17 +105,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateScreen }) => {
               />
             </span>
           </button>
-
-          {/* Download */}
-          <a
-            href="/institute-operations-copilot.zip"
-            download="institute-operations-copilot.zip"
-            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-            title="Download source code"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-400" />
-            Download ZIP
-          </a>
 
           {/* Role Switcher */}
           <div className="relative">

@@ -266,7 +266,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Footer */}
       {!isCollapsed && (
         <div className="px-3 py-2.5 border-t border-white/5">
-          <div className="text-[10px] text-slate-700 font-mono">FastAPI · SafeQuery™</div>
+          <div className="text-[10px] text-slate-700 font-mono">Operations Console</div>
         </div>
       )}
     </aside>
