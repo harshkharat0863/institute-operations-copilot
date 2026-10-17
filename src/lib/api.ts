@@ -90,17 +90,21 @@ export function isMockMode(): boolean {
     if (override !== null) {
       return override === 'true';
     }
+    // When running in production (e.g. Render, Railway, cloud), always use Live API + Supabase
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return false;
+    }
   }
 
   // Check Vite env
   if (typeof import.meta !== 'undefined' && import.meta.env) {
     if (import.meta.env.VITE_USE_MOCK !== undefined) {
-      return import.meta.env.VITE_USE_MOCK !== 'false';
+      return import.meta.env.VITE_USE_MOCK === 'true';
     }
   }
 
-  // Fallback default: true (Mock first per spec)
-  return true;
+  // Default to false so all registrations and queries store directly in Supabase
+  return false;
 }
 
 export function setMockMode(enabled: boolean): void {
@@ -114,6 +118,12 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const customUrl = localStorage.getItem('copilot_api_url');
     if (customUrl) return customUrl;
+
+    // When deployed on cloud or served directly from unified FastAPI server,
+    // use relative path (empty string) so API requests target the current origin!
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return '';
+    }
   }
   if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
@@ -187,45 +197,48 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
 export const api = {
   // 1. Authentication
   async login(email: string, roleHint?: UserRole): Promise<{ token: string; user: User }> {
-    if (isMockMode()) {
-      await new Promise(r => setTimeout(r, 200)); // simulate network latency
-      const normalized = email.toLowerCase().trim();
-      let user: User | undefined = mockUsersStore[normalized];
-
-      if (!user) {
-        if (normalized.includes('owner') || roleHint === 'owner') user = DEMO_USERS.owner;
-        else if (normalized.includes('counselor') || roleHint === 'counselor') user = DEMO_USERS.counselor;
-        else if (normalized.includes('trainer') || roleHint === 'trainer') user = DEMO_USERS.trainer;
-        else if (normalized.includes('accounts') || roleHint === 'accounts') user = DEMO_USERS.accounts;
-        else user = {
-          id: `usr_custom_${Date.now()}`,
-          name: email.split('@')[0],
-          email: normalized,
-          role: roleHint || 'counselor',
-          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(email)}`,
-        };
-      }
-
-      const token = generateMockJwt(user);
-      localStorage.setItem('copilot_jwt_token', token);
-      recordAuditLog({
-        user_name: user.name,
-        role: user.role,
-        action: 'login',
-        target: 'Web Console',
-        details: `Successful authentication as ${user.role}`,
-        ip_address: '127.0.0.1 (Local)',
-        status: 'success',
+    try {
+      const data = await apiFetch<{ token: string; user: User }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, role: roleHint }),
       });
-      return { token, user };
-    }
+      localStorage.setItem('copilot_jwt_token', data.token);
+      return data;
+    } catch (err) {
+      if (isMockMode()) {
+        await new Promise(r => setTimeout(r, 150));
+        const normalized = email.toLowerCase().trim();
+        let user: User | undefined = mockUsersStore[normalized];
 
-    const data = await apiFetch<{ token: string; user: User }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-    localStorage.setItem('copilot_jwt_token', data.token);
-    return data;
+        if (!user) {
+          if (normalized.includes('owner') || roleHint === 'owner') user = DEMO_USERS.owner;
+          else if (normalized.includes('counselor') || roleHint === 'counselor') user = DEMO_USERS.counselor;
+          else if (normalized.includes('trainer') || roleHint === 'trainer') user = DEMO_USERS.trainer;
+          else if (normalized.includes('accounts') || roleHint === 'accounts') user = DEMO_USERS.accounts;
+          else user = {
+            id: `usr_custom_${Date.now()}`,
+            name: email.split('@')[0],
+            email: normalized,
+            role: roleHint || 'counselor',
+            avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(email)}`,
+          };
+        }
+
+        const token = generateMockJwt(user);
+        localStorage.setItem('copilot_jwt_token', token);
+        recordAuditLog({
+          user_name: user.name,
+          role: user.role,
+          action: 'login',
+          target: 'Web Console',
+          details: `Successful authentication as ${user.role}`,
+          ip_address: '127.0.0.1 (Local)',
+          status: 'success',
+        });
+        return { token, user };
+      }
+      throw err;
+    }
   },
 
   async register(data: {
@@ -236,50 +249,59 @@ export const api = {
     phone?: string;
     specialization?: string;
   }): Promise<{ token: string; user: User }> {
-    if (isMockMode()) {
-      await new Promise(r => setTimeout(r, 250));
+    // 1. Always send to live backend to store immediately in Supabase PostgreSQL users table
+    try {
+      const res = await apiFetch<{ token: string; user: User }>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      localStorage.setItem('copilot_jwt_token', res.token);
+      
+      // Also cache user in local mock store for offline resilience
       const norm = data.email.toLowerCase().trim();
-      const newUser: User = {
-        id: `usr_${data.role}_${Date.now()}`,
-        name: data.name,
-        email: norm,
-        role: data.role,
-        trainer_id: data.role === 'trainer' ? `tr_${Date.now() % 1000}` : undefined,
-        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(data.name)}`,
-      };
-
-      mockUsersStore[norm] = newUser;
+      mockUsersStore[norm] = res.user;
       if (typeof window !== 'undefined') {
         try {
           const saved = localStorage.getItem('registered_institute_users');
           const current = saved ? JSON.parse(saved) : {};
-          current[norm] = newUser;
+          current[norm] = res.user;
           localStorage.setItem('registered_institute_users', JSON.stringify(current));
         } catch (e) {
           console.error(e);
         }
       }
+      return res;
+    } catch (err) {
+      if (isMockMode()) {
+        await new Promise(r => setTimeout(r, 200));
+        const norm = data.email.toLowerCase().trim();
+        const newUser: User = {
+          id: `usr_${data.role}_${Date.now()}`,
+          name: data.name,
+          email: norm,
+          role: data.role,
+          trainer_id: data.role === 'trainer' ? `tr_${Date.now() % 1000}` : undefined,
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(data.name)}`,
+        };
 
-      const token = generateMockJwt(newUser);
-      localStorage.setItem('copilot_jwt_token', token);
-      recordAuditLog({
-        user_name: newUser.name,
-        role: newUser.role,
-        action: 'user_registered',
-        target: 'Operations Auth Roster',
-        details: `Registered new account as ${newUser.role} with ${data.email}`,
-        ip_address: '127.0.0.1 (Local)',
-        status: 'success',
-      });
-      return { token, user: newUser };
+        mockUsersStore[norm] = newUser;
+        if (typeof window !== 'undefined') {
+          try {
+            const saved = localStorage.getItem('registered_institute_users');
+            const current = saved ? JSON.parse(saved) : {};
+            current[norm] = newUser;
+            localStorage.setItem('registered_institute_users', JSON.stringify(current));
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
+        const token = generateMockJwt(newUser);
+        localStorage.setItem('copilot_jwt_token', token);
+        return { token, user: newUser };
+      }
+      throw err;
     }
-
-    const res = await apiFetch<{ token: string; user: User }>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-    localStorage.setItem('copilot_jwt_token', res.token);
-    return res;
   },
 
   // 2. Students CRUD
