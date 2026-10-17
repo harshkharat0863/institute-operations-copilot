@@ -278,6 +278,7 @@ export interface DropoutRiskStudent {
   last_login_days_ago: number;
   reasons: string[];
   recommended_intervention: string;
+  intervention_status: 'none' | 'counseling_scheduled' | 'whatsapp_sent' | 'plan_restructured';
 }
 
 export interface FailureChainEvidence {

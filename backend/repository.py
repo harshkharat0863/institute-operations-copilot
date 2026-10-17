@@ -843,51 +843,127 @@ class Repository:
 
     # 15. Dropout Risk Radar
     async def get_dropout_risk(self) -> List[dict]:
-        return [
-            {
-                "id": "dr_1",
-                "student_id": "std_java_003",
-                "student_name": "Sneha Patil",
-                "batch_name": "Java Fullstack - Batch B",
-                "course_name": "Java Fullstack Masterclass",
-                "risk_score": 92,
-                "risk_tier": "critical",
-                "attendance_rate": 61,
-                "missed_classes": 5,
-                "consecutive_absences": 4,
-                "overdue_emis_count": 1,
-                "total_overdue_amount": 6500,
-                "last_login_days_ago": 6,
-                "reasons": [
-                    "5 missed classes in the last 30 days (<65% attendance rate)",
-                    "4 consecutive absences since last lab check-in",
-                    "Overdue EMI installment of ₹6,500 due today"
-                ],
-                "recommended_intervention": "Immediate counseling call + offer 1-on-1 lab makeup slot + EMI grace window",
-                "intervention_status": "none"
-            },
-            {
-                "id": "dr_2",
-                "student_id": "std_java_001",
-                "student_name": "Aarav Sharma",
-                "batch_name": "Java Fullstack - Batch A",
-                "course_name": "Java Fullstack Masterclass",
-                "risk_score": 79,
-                "risk_tier": "high",
-                "attendance_rate": 68,
-                "missed_classes": 4,
-                "consecutive_absences": 2,
-                "overdue_emis_count": 1,
-                "total_overdue_amount": 6500,
-                "last_login_days_ago": 4,
-                "reasons": [
-                    "Attendance rate dropped to 68%",
-                    "Upcoming EMI installment due in 2 days (₹6,500)"
-                ],
-                "recommended_intervention": "Send WhatsApp academic encouragement alert + counselor mentor check-in",
-                "intervention_status": "none"
-            }
-        ]
+        if not hasattr(self, 'dropout_risk'):
+            self.dropout_risk = [
+                {
+                    "id": "dr_1",
+                    "student_id": "std_java_003",
+                    "student_name": "Sneha Patil",
+                    "batch_name": "Java Fullstack - Batch B",
+                    "course_name": "Java Fullstack Masterclass",
+                    "risk_score": 92,
+                    "risk_tier": "critical",
+                    "attendance_rate": 61,
+                    "missed_classes": 5,
+                    "consecutive_absences": 4,
+                    "overdue_emis_count": 1,
+                    "total_overdue_amount": 6500,
+                    "last_login_days_ago": 6,
+                    "reasons": [
+                        "5 missed classes in the last 30 days (<65% attendance rate)",
+                        "4 consecutive absences since last lab check-in",
+                        "Overdue EMI installment of ₹6,500 due today",
+                        "Zero LMS logins in the past 6 days"
+                    ],
+                    "recommended_intervention": "Immediate counseling call + offer 1-on-1 lab makeup slot + EMI grace window",
+                    "intervention_status": "none"
+                },
+                {
+                    "id": "dr_2",
+                    "student_id": "std_java_001",
+                    "student_name": "Aarav Sharma",
+                    "batch_name": "Java Fullstack - Batch A",
+                    "course_name": "Java Fullstack Masterclass",
+                    "risk_score": 79,
+                    "risk_tier": "high",
+                    "attendance_rate": 68,
+                    "missed_classes": 4,
+                    "consecutive_absences": 2,
+                    "overdue_emis_count": 1,
+                    "total_overdue_amount": 6500,
+                    "last_login_days_ago": 4,
+                    "reasons": [
+                        "Attendance rate dropped to 68%",
+                        "Upcoming EMI installment due in 2 days (₹6,500)",
+                        "Incomplete assignments for Module 3 (Spring Data)"
+                    ],
+                    "recommended_intervention": "Send WhatsApp academic encouragement alert + counselor mentor check-in",
+                    "intervention_status": "none"
+                },
+                {
+                    "id": "dr_3",
+                    "student_id": "std_ds_005",
+                    "student_name": "Manish Choudhury",
+                    "batch_name": "Data Science & GenAI - Batch A",
+                    "course_name": "Data Science & Generative AI",
+                    "risk_score": 86,
+                    "risk_tier": "critical",
+                    "attendance_rate": 80,
+                    "missed_classes": 2,
+                    "consecutive_absences": 1,
+                    "overdue_emis_count": 2,
+                    "total_overdue_amount": 27500,
+                    "last_login_days_ago": 3,
+                    "reasons": [
+                        "2 consecutive missed fee installments amounting to ₹27,500 (18 days overdue)",
+                        "High financial risk of LMS account freeze"
+                    ],
+                    "recommended_intervention": "Financial restructuring call: split remaining balance into 3 smaller micro-installments",
+                    "intervention_status": "none"
+                },
+                {
+                    "id": "dr_4",
+                    "student_id": "std_java_002",
+                    "student_name": "Rohan Gupta",
+                    "batch_name": "Java Fullstack - Batch A",
+                    "course_name": "Java Fullstack Masterclass",
+                    "risk_score": 64,
+                    "risk_tier": "moderate",
+                    "attendance_rate": 72,
+                    "missed_classes": 3,
+                    "consecutive_absences": 1,
+                    "overdue_emis_count": 1,
+                    "total_overdue_amount": 7000,
+                    "last_login_days_ago": 2,
+                    "reasons": [
+                        "3 missed classes in the last 30 days",
+                        "EMI of ₹7,000 due on 19 Oct"
+                    ],
+                    "recommended_intervention": "Send friendly automated reminder + check lab attendance",
+                    "intervention_status": "none"
+                },
+                {
+                    "id": "dr_5",
+                    "student_id": "std_java_004",
+                    "student_name": "Vikram Malhotra",
+                    "batch_name": "Java Fullstack - Batch B",
+                    "course_name": "Java Fullstack Masterclass",
+                    "risk_score": 58,
+                    "risk_tier": "moderate",
+                    "attendance_rate": 70,
+                    "missed_classes": 3,
+                    "consecutive_absences": 1,
+                    "overdue_emis_count": 1,
+                    "total_overdue_amount": 8000,
+                    "last_login_days_ago": 1,
+                    "reasons": [
+                        "Borderline attendance (70%)",
+                        "EMI installment due on 20 Oct"
+                    ],
+                    "recommended_intervention": "Review weekly progress in Friday mentorship sync",
+                    "intervention_status": "none"
+                }
+            ]
+        return self.dropout_risk
+
+    async def intervene_dropout_risk(self, student_id: str, action_type: str) -> dict:
+        if not hasattr(self, 'dropout_risk'):
+            await self.get_dropout_risk()
+        for s in self.dropout_risk:
+            if s["id"] == student_id or s["student_id"] == student_id:
+                s["intervention_status"] = action_type
+                return s
+        return {"id": student_id, "intervention_status": action_type}
 
     async def get_failure_chains(self) -> List[dict]:
         return [
