@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { Navbar } from './components/common/Navbar';
 import { Sidebar, ALL_NAV_ITEMS } from './components/common/Sidebar';
 import { Forbidden } from './components/common/Forbidden';
@@ -30,6 +31,7 @@ import { Modal } from './components/common/Modal';
 
 function MainApp() {
   const { isAuthenticated, role, isLoading, forbiddenScreenTriggered, setForbiddenScreenTriggered } = useAuth();
+  const { isDark } = useTheme();
   const [activeScreen, setActiveScreen] = useState<string>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isReadmeModalOpen, setIsReadmeModalOpen] = useState<boolean>(false);
@@ -48,7 +50,7 @@ function MainApp() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
         <div className="text-center space-y-3">
           <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
           <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -117,7 +119,7 @@ function MainApp() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col antialiased font-sans text-slate-900">
+    <div className={`min-h-screen flex flex-col antialiased font-sans transition-colors duration-200 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'}`}>
       <Navbar onNavigateScreen={setActiveScreen} />
 
       <div className="flex flex-1">
@@ -270,10 +272,12 @@ function MainApp() {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <MainApp />
-      </AuthProvider>
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <MainApp />
+        </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }

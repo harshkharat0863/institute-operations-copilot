@@ -15,6 +15,7 @@ import { isMockMode, setMockMode, getApiBaseUrl, setApiBaseUrl } from '../../lib
 import { UserRole } from '../../types';
 import { Badge, BadgeVariant } from './Badge';
 import { Modal } from './Modal';
+import { ThemeToggle } from './ThemeToggle';
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -105,6 +106,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateScreen }) => {
               />
             </span>
           </button>
+
+          {/* Dark / Light Theme Toggle */}
+          <ThemeToggle variant="button" />
 
           {/* Role Switcher */}
           <div className="relative">

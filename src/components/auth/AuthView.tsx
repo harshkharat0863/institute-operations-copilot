@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useTheme } from '../../context/ThemeContext';
+import { ThemeToggle } from '../common/ThemeToggle';
 import { DEMO_USERS } from '../../lib/mock/data';
 import { UserRole } from '../../types';
 
@@ -73,6 +75,7 @@ interface AuthViewProps {
 export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'signin', onBackToHome }) => {
   const { login, register, isLoading } = useAuth();
   const { showToast } = useToast();
+  const { isDark } = useTheme();
 
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>(initialMode);
 
@@ -145,21 +148,33 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'signin', onBa
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-between p-4 sm:p-6 lg:p-8 antialiased font-sans text-slate-100 selection:bg-indigo-500 selection:text-white">
+    <div className={`min-h-screen flex flex-col justify-between p-4 sm:p-6 lg:p-8 antialiased font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200 ${
+      isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
+    }`}>
       {/* Top Header Bar */}
-      <div className="max-w-4xl w-full mx-auto flex items-center justify-between pb-4">
+      <div className="max-w-4xl w-full mx-auto flex items-center justify-between pb-4 gap-3">
         <button
           onClick={onBackToHome}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+          className={`inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
+            isDark
+              ? 'text-slate-400 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+              : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:border-slate-300 shadow-xs'
+          }`}
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to Project Overview</span>
         </button>
 
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <Database className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="hidden sm:inline">Supabase Database Connected</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="flex items-center gap-3">
+          <ThemeToggle variant="segmented" />
+
+          <div className={`flex items-center gap-2 text-xs px-2.5 py-1 rounded-lg border ${
+            isDark ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-600 shadow-xs'
+          }`}>
+            <Database className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Database Active</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          </div>
         </div>
       </div>
 
