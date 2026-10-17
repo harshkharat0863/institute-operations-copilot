@@ -13,7 +13,6 @@ import {
   Layers,
   Video,
   Award,
-  Clock,
   ArrowUpRight,
   ShieldAlert,
   Bot,
@@ -40,9 +39,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onOpenAuth }) 
           <div>
             <div className="flex items-center gap-2">
               <span className="font-bold text-white text-base tracking-tight">InstituteOps</span>
-              <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-300 bg-indigo-950/80 border border-indigo-700/60 px-2 py-0.5 rounded-full">
-                ENTERPRISE
-              </span>
             </div>
             <p className="text-[10px] text-slate-400 font-medium hidden sm:block">AI Operations Platform</p>
           </div>
@@ -140,96 +136,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onOpenAuth }) 
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
               <span>Human-in-the-Loop Message Approvals</span>
             </div>
-          </div>
-        </div>
-
-        {/* Product Visual Mockup / Interface Snapshot */}
-        <div className="mt-14 relative z-10 rounded-2xl p-2 bg-gradient-to-b from-slate-700/60 to-slate-800/40 border border-slate-700/60 shadow-2xl max-w-5xl mx-auto">
-          <div className="rounded-xl bg-slate-900 overflow-hidden border border-slate-800 p-4 sm:p-6">
-            {/* Mock Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-rose-500/80" />
-                <div className="w-3 h-3 rounded-full bg-amber-500/80" />
-                <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
-                <span className="ml-2 font-mono text-xs text-slate-400">operations-console.institute.internal</span>
-              </div>
-              <span className="text-[11px] font-mono text-indigo-400 bg-indigo-950/80 border border-indigo-800 px-2.5 py-0.5 rounded-full">
-                PS1 Benchmark Verified
-              </span>
-            </div>
-
-            {/* Mock Preview Content */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 text-left">
-              {/* Card 1: Copilot NLP Ask */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-3">
-                <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold">
-                  <Bot className="w-4 h-4" />
-                  <span>Natural Language Query</span>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs text-slate-300">
-                  "Which students in the Java batch missed three or more classes and have an EMI due this week?"
-                </div>
-                <div className="text-[11px] text-emerald-400 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                  <span>Identified 4 flagged students + 1-click WhatsApp staging</span>
-                </div>
-              </div>
-
-              {/* Card 2: Clash-Free Timetable Re-plan */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-3">
-                <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold">
-                  <Calendar className="w-4 h-4" />
-                  <span>Clash-Free Solver (&lt; 60ms)</span>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs text-slate-300">
-                  Trainer unavailable on Tuesday ➔ shifted 3 sessions to Wednesday/Thursday with 0 clashes.
-                </div>
-                <div className="text-[11px] text-amber-400 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 shrink-0" />
-                  <span>Room capacity (45 seats) & online limits verified</span>
-                </div>
-              </div>
-
-              {/* Card 3: The Hidden Student Failure Chain */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-3">
-                <div className="flex items-center gap-2 text-rose-400 text-xs font-semibold">
-                  <ShieldAlert className="w-4 h-4" />
-                  <span>Failure Chain Correlation</span>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs text-slate-300">
-                  Correlates attendance, failed quizzes, unpaid EMIs, and idle LMS telemetry into a unified action plan.
-                </div>
-                <div className="text-[11px] text-sky-400 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 shrink-0" />
-                  <span>Replaces fragmented alerts with Counselor-Trainer sync</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          3. 4-PILLAR OPERATIONAL METRICS BAR
-          ========================================================================= */}
-      <section className="border-y border-slate-800 bg-slate-900/50 py-10 px-4 sm:px-8 lg:px-12">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          <div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">0 Clashes</div>
-            <div className="text-xs text-slate-400 mt-1 uppercase font-semibold tracking-wider">Multi-Resource Timetable Solver</div>
-          </div>
-          <div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-indigo-400 tracking-tight">4 Roles</div>
-            <div className="text-xs text-slate-400 mt-1 uppercase font-semibold tracking-wider">Non-Bypassable Schema Guardrails</div>
-          </div>
-          <div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-emerald-400 tracking-tight">99.8%</div>
-            <div className="text-xs text-slate-400 mt-1 uppercase font-semibold tracking-wider">Hybrid Attendance Verification</div>
-          </div>
-          <div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-sky-400 tracking-tight">100% Audit</div>
-            <div className="text-xs text-slate-400 mt-1 uppercase font-semibold tracking-wider">Immutable Query & Action History</div>
           </div>
         </div>
       </section>

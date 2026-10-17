@@ -175,9 +175,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'signin', onBa
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-slate-900 text-base tracking-tight">InstituteOps</span>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.2 rounded-full">
-                  ENTERPRISE
-                </span>
               </div>
               <p className="text-[11px] text-slate-500">Institute Operations & AI Copilot Desk</p>
             </div>
