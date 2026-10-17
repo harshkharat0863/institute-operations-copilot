@@ -14,6 +14,14 @@ class User(BaseModel):
     trainer_id: Optional[str] = None
     avatar: Optional[str] = None
 
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    role: UserRole
+    phone: Optional[str] = None
+    specialization: Optional[str] = None
+
 class Student(BaseModel):
     id: str
     name: str

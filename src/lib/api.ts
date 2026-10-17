@@ -57,6 +57,29 @@ let mockRecordingsStore: ClassRecording[] = JSON.parse(JSON.stringify(RECORDINGS
 let mockDropoutRiskStore: DropoutRiskStudent[] = JSON.parse(JSON.stringify(DROPOUT_RISK_DATA));
 let mockFailureChainsStore: FailureChainStudent[] = JSON.parse(JSON.stringify(FAILURE_CHAINS_DATA));
 
+// Persistent registered users store in mock mode
+const getSavedMockUsers = (): Record<string, User> => {
+  const base: Record<string, User> = {
+    [DEMO_USERS.owner.email.toLowerCase()]: DEMO_USERS.owner,
+    [DEMO_USERS.counselor.email.toLowerCase()]: DEMO_USERS.counselor,
+    [DEMO_USERS.trainer.email.toLowerCase()]: DEMO_USERS.trainer,
+    [DEMO_USERS.accounts.email.toLowerCase()]: DEMO_USERS.accounts,
+  };
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('registered_institute_users');
+      if (saved) {
+        Object.assign(base, JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error('Failed to parse saved users', e);
+    }
+  }
+  return base;
+};
+
+let mockUsersStore = getSavedMockUsers();
+
 /**
  * Determine if mock mode is active.
  * Checks localStorage first (runtime toggle), then Vite/Next environment variables.
@@ -166,15 +189,22 @@ export const api = {
   async login(email: string, roleHint?: UserRole): Promise<{ token: string; user: User }> {
     if (isMockMode()) {
       await new Promise(r => setTimeout(r, 200)); // simulate network latency
-      // Find matching demo user or construct based on role
-      let user: User | undefined;
       const normalized = email.toLowerCase().trim();
+      let user: User | undefined = mockUsersStore[normalized];
 
-      if (normalized.includes('owner') || roleHint === 'owner') user = DEMO_USERS.owner;
-      else if (normalized.includes('counselor') || roleHint === 'counselor') user = DEMO_USERS.counselor;
-      else if (normalized.includes('trainer') || roleHint === 'trainer') user = DEMO_USERS.trainer;
-      else if (normalized.includes('accounts') || roleHint === 'accounts') user = DEMO_USERS.accounts;
-      else user = DEMO_USERS.owner;
+      if (!user) {
+        if (normalized.includes('owner') || roleHint === 'owner') user = DEMO_USERS.owner;
+        else if (normalized.includes('counselor') || roleHint === 'counselor') user = DEMO_USERS.counselor;
+        else if (normalized.includes('trainer') || roleHint === 'trainer') user = DEMO_USERS.trainer;
+        else if (normalized.includes('accounts') || roleHint === 'accounts') user = DEMO_USERS.accounts;
+        else user = {
+          id: `usr_custom_${Date.now()}`,
+          name: email.split('@')[0],
+          email: normalized,
+          role: roleHint || 'counselor',
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(email)}`,
+        };
+      }
 
       const token = generateMockJwt(user);
       localStorage.setItem('copilot_jwt_token', token);
@@ -196,6 +226,60 @@ export const api = {
     });
     localStorage.setItem('copilot_jwt_token', data.token);
     return data;
+  },
+
+  async register(data: {
+    name: string;
+    email: string;
+    password: string;
+    role: UserRole;
+    phone?: string;
+    specialization?: string;
+  }): Promise<{ token: string; user: User }> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 250));
+      const norm = data.email.toLowerCase().trim();
+      const newUser: User = {
+        id: `usr_${data.role}_${Date.now()}`,
+        name: data.name,
+        email: norm,
+        role: data.role,
+        trainer_id: data.role === 'trainer' ? `tr_${Date.now() % 1000}` : undefined,
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(data.name)}`,
+      };
+
+      mockUsersStore[norm] = newUser;
+      if (typeof window !== 'undefined') {
+        try {
+          const saved = localStorage.getItem('registered_institute_users');
+          const current = saved ? JSON.parse(saved) : {};
+          current[norm] = newUser;
+          localStorage.setItem('registered_institute_users', JSON.stringify(current));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      const token = generateMockJwt(newUser);
+      localStorage.setItem('copilot_jwt_token', token);
+      recordAuditLog({
+        user_name: newUser.name,
+        role: newUser.role,
+        action: 'user_registered',
+        target: 'Operations Auth Roster',
+        details: `Registered new account as ${newUser.role} with ${data.email}`,
+        ip_address: '127.0.0.1 (Local)',
+        status: 'success',
+      });
+      return { token, user: newUser };
+    }
+
+    const res = await apiFetch<{ token: string; user: User }>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    localStorage.setItem('copilot_jwt_token', res.token);
+    return res;
   },
 
   // 2. Students CRUD

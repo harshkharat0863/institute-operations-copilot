@@ -11,6 +11,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, roleHint?: UserRole) => Promise<void>;
+  register: (name: string, email: string, password: string, role: UserRole, specialization?: string) => Promise<void>;
   logout: () => void;
   switchRoleQuick: (targetRole: UserRole) => Promise<void>;
   forbiddenScreenTriggered: boolean;
@@ -93,6 +94,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const register = async (name: string, email: string, password: string, role: UserRole, specialization?: string) => {
+    setIsLoading(true);
+    try {
+      const { token: newToken } = await api.register({ name, email, password, role, specialization });
+      setToken(newToken);
+      setForbiddenScreenTriggered(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('copilot_jwt_token');
     setToken(null);
@@ -117,6 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user && !!role,
         isLoading,
         login,
+        register,
         logout,
         switchRoleQuick,
         forbiddenScreenTriggered,

@@ -243,6 +243,51 @@ class Repository:
         self.query_logs = list(QUERY_LOGS_DATA)
         self.sessions = list(TIMETABLE_SESSIONS_DATA)
         self.timetable_changes: List[TimetableChange] = []
+        self.users_db: Dict[str, dict] = {u["email"].lower(): u for u in DEMO_USERS.values()}
+
+    # Users / Authentication
+    async def find_user_by_email(self, email: str) -> Optional[dict]:
+        norm = email.lower().strip()
+        sb = get_supabase()
+        if sb:
+            try:
+                res = sb.table("users").select("*").eq("email", norm).execute()
+                if res.data and len(res.data) > 0:
+                    return res.data[0]
+            except Exception as e:
+                print(f"[Supabase find_user error]: {e}")
+        return self.users_db.get(norm)
+
+    async def register_user(self, name: str, email: str, password: str, role: str, specialization: Optional[str] = None) -> dict:
+        norm = email.lower().strip()
+        new_id = f"usr_{role}_{int(time.time())}"
+        trainer_id = f"tr_{int(time.time() % 1000)}" if role == "trainer" else None
+        user_record = {
+            "id": new_id,
+            "name": name,
+            "email": norm,
+            "role": role,
+            "trainer_id": trainer_id,
+            "avatar": f"https://api.dicebear.com/7.x/initials/svg?seed={name.replace(' ', '+')}",
+        }
+        sb = get_supabase()
+        if sb:
+            try:
+                sb.table("users").insert({**user_record, "created_at": time.strftime('%Y-%m-%dT%H:%M:%SZ')}).execute()
+            except Exception as e:
+                print(f"[Supabase register_user error]: {e}")
+        self.users_db[norm] = user_record
+        if role == "trainer":
+            self.trainers.append({
+                "id": trainer_id,
+                "name": name,
+                "email": norm,
+                "specialization": [s.strip() for s in (specialization or "Core Programming").split(",")],
+                "max_hours_per_week": 25,
+                "allocated_hours": 0,
+                "status": "available",
+            })
+        return user_record
 
     # Students
     async def get_students(self, batch_id: Optional[str] = None, status: Optional[str] = None) -> List[dict]:

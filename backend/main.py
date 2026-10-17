@@ -12,7 +12,7 @@ import jwt
 from dotenv import load_dotenv
 
 from backend.models import (
-    User, StudentCreate, BatchCreate, CheckInRequest, OnlineJoinRequest,
+    User, RegisterRequest, StudentCreate, BatchCreate, CheckInRequest, OnlineJoinRequest,
     DraftRemindersRequest, BulkApproveRequest, ReplanRequest,
     IssueCertificateRequest, DropoutInterventionRequest
 )
@@ -87,14 +87,31 @@ def require_roles(*allowed_roles: str):
 @app.post("/auth/login")
 async def login(req: LoginRequest):
     normalized = req.email.lower().strip()
-    user = DEMO_USERS["owner"]
-    if "counselor" in normalized:
-        user = DEMO_USERS["counselor"]
-    elif "trainer" in normalized:
-        user = DEMO_USERS["trainer"]
-    elif "accounts" in normalized:
-        user = DEMO_USERS["accounts"]
+    # Check registered users first
+    user = await repo.find_user_by_email(normalized)
+    if not user:
+        # Fallback to role heuristic for demo presets
+        if "counselor" in normalized:
+            user = DEMO_USERS["counselor"]
+        elif "trainer" in normalized:
+            user = DEMO_USERS["trainer"]
+        elif "accounts" in normalized:
+            user = DEMO_USERS["accounts"]
+        else:
+            user = DEMO_USERS["owner"]
 
+    token = create_jwt_token(user)
+    return {"token": token, "user": user}
+
+@app.post("/auth/register")
+async def register(req: RegisterRequest):
+    user = await repo.register_user(
+        name=req.name,
+        email=req.email,
+        password=req.password,
+        role=req.role,
+        specialization=req.specialization
+    )
     token = create_jwt_token(user)
     return {"token": token, "user": user}
 
