@@ -175,3 +175,83 @@ def test_benchmark_query_with_mocked_gemini_and_db():
         executed_sql = mock_sb.rpc.call_args[0][1]["sql_text"]
         assert "student_fee_summary" in executed_sql
         assert "LIMIT 200" in executed_sql
+
+
+# -------------------------------------------------------------
+# 6. GEMINI RETRY & FALLBACK RESILIENCE TESTS
+# -------------------------------------------------------------
+def test_gemini_retry_on_503_success():
+    """Mock a 503 error on initial call followed by a success on retry."""
+    from backend.copilot import generate_gemini_sql
+
+    mock_client = MagicMock()
+    mock_success_response = MagicMock(text="SELECT student_name FROM students LIMIT 200")
+
+    mock_client.models.generate_content.side_effect = [
+        Exception("503 UNAVAILABLE: The model is overloaded. Please try again later."),
+        mock_success_response,
+    ]
+
+    with patch("google.genai.Client", return_value=mock_client), \
+         patch("time.sleep") as mock_sleep:
+        sql = generate_gemini_sql(
+            api_key="test-api-key",
+            system_instruction="Generate SELECT",
+            question="Show all students"
+        )
+
+        assert sql == "SELECT student_name FROM students LIMIT 200"
+        assert mock_client.models.generate_content.call_count == 2
+        mock_sleep.assert_called_once_with(1.0)
+
+
+def test_gemini_fallback_model_invoked_when_primary_exhausted():
+    """When primary model exhausts retries, fallback model is tried."""
+    from backend.copilot import generate_gemini_sql
+
+    mock_client = MagicMock()
+    mock_fallback_response = MagicMock(text="SELECT batch_name FROM batches LIMIT 200")
+
+    # Primary model fails 4 times (1 initial + 3 retries), fallback succeeds on first attempt
+    mock_client.models.generate_content.side_effect = [
+        Exception("503 UNAVAILABLE"),
+        Exception("503 UNAVAILABLE"),
+        Exception("503 UNAVAILABLE"),
+        Exception("503 UNAVAILABLE"),
+        mock_fallback_response,
+    ]
+
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_FALLBACK_MODEL": "gemini-1.5-flash"}), \
+         patch("google.genai.Client", return_value=mock_client), \
+         patch("time.sleep") as mock_sleep:
+
+        sql = generate_gemini_sql(
+            api_key="test-api-key",
+            system_instruction="Generate SELECT",
+            question="List batches"
+        )
+
+        assert sql == "SELECT batch_name FROM batches LIMIT 200"
+        # 4 calls for primary + 1 call for fallback = 5 calls total
+        assert mock_client.models.generate_content.call_count == 5
+        # Delays for 3 primary retries: 1.0, 2.0, 4.0
+        assert mock_sleep.call_count == 3
+        mock_sleep.assert_any_call(1.0)
+        mock_sleep.assert_any_call(2.0)
+        mock_sleep.assert_any_call(4.0)
+
+
+def test_gemini_all_retries_fail_returns_friendly_message():
+    """When all retries fail, user receives friendly message without raw Google error text."""
+    mock_client = MagicMock()
+    mock_client.models.generate_content.side_effect = Exception("503 UNAVAILABLE: Backend server cluster failure")
+
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}), \
+         patch("google.genai.Client", return_value=mock_client), \
+         patch("time.sleep"):
+
+        res = asyncio.run(process_copilot_ask("Show all students", role="owner"))
+        assert res["status"] == "error"
+        assert res["answer"] == "The AI service is busy right now. Please try again in a moment."
+        assert "Backend server cluster failure" not in res["answer"]
+

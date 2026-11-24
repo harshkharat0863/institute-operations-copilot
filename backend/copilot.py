@@ -17,6 +17,7 @@ load_dotenv()
 logger = logging.getLogger("institute_ops.copilot")
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL")
 
 # -------------------------------------------------------------
 # 1. ROLE-BASED SCHEMA WHITELISTS (Item 1 & 2)
@@ -206,15 +207,86 @@ def validate_and_format_sql(sql_query: str, role: str) -> str:
 # -------------------------------------------------------------
 # 3. TEXT-TO-SQL PIPELINE WITH GEMINI (Items 1, 3, 4, 5, 6, 8)
 # -------------------------------------------------------------
+def _is_retryable_gemini_error(exc: Exception) -> bool:
+    """Check if exception is a 503 UNAVAILABLE, 429, or timeout error."""
+    for attr in ("code", "status_code", "http_status"):
+        val = getattr(exc, attr, None)
+        if isinstance(val, int) and val in (503, 429):
+            return True
+        if isinstance(val, str) and val in ("503", "429"):
+            return True
+
+    exc_name = exc.__class__.__name__.lower()
+    if "timeout" in exc_name or isinstance(exc, TimeoutError):
+        return True
+
+    msg = str(exc).upper()
+    retry_keywords = ["503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "TIMEOUT", "TIMED OUT", "DEADLINE EXCEEDED"]
+    if any(k in msg for k in retry_keywords):
+        return True
+
+    return False
+
+
+def _call_gemini_model_with_retries(client: Any, model: str, system_instruction: str, question: str) -> str:
+    """Attempt call with model; if 503, 429, or timeout, retry up to 3 times with waits 1s, 2s, 4s."""
+    retry_delays = [1.0, 2.0, 4.0]
+    max_attempts = 1 + len(retry_delays)  # 1 initial + 3 retries = 4 attempts
+    last_exc = None
+
+    for attempt in range(max_attempts):
+        try:
+            logger.info(f"Invoking Gemini model '{model}' (attempt {attempt + 1}/{max_attempts})")
+            gen_response = client.models.generate_content(
+                model=model,
+                contents=[system_instruction, f"User Question: {question}"],
+            )
+            return gen_response.text.strip()
+        except Exception as e:
+            last_exc = e
+            if attempt < len(retry_delays) and _is_retryable_gemini_error(e):
+                delay = retry_delays[attempt]
+                logger.warning(
+                    f"Gemini model '{model}' failed with retryable error (attempt {attempt + 1}/{max_attempts}): {e}. Retrying in {delay}s..."
+                )
+                time.sleep(delay)
+            else:
+                logger.warning(f"Gemini model '{model}' attempt {attempt + 1} failed: {e}")
+                if not _is_retryable_gemini_error(e):
+                    break
+
+    raise last_exc
+
+
 def generate_gemini_sql(api_key: str, system_instruction: str, question: str) -> str:
-    """Invoke Gemini model to generate SQL query from natural language."""
+    """Invoke Gemini model to generate SQL query with retry and fallback model resilience."""
     from google import genai
     client = genai.Client(api_key=api_key)
-    gen_response = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=[system_instruction, f"User Question: {question}"],
-    )
-    return gen_response.text.strip()
+
+    primary_model = os.getenv("GEMINI_MODEL", GEMINI_MODEL)
+    fallback_model = os.getenv("GEMINI_FALLBACK_MODEL", GEMINI_FALLBACK_MODEL)
+
+    last_error = None
+    # 1. Try primary model with up to 3 retries (waits: 1s, 2s, 4s)
+    try:
+        return _call_gemini_model_with_retries(client, primary_model, system_instruction, question)
+    except Exception as e:
+        last_error = e
+        logger.error(f"Primary Gemini model '{primary_model}' exhausted retries: {e}")
+
+    # 2. Try fallback model if configured and distinct, with same retry rules
+    if fallback_model and fallback_model.strip() and fallback_model.strip() != primary_model:
+        fallback_model = fallback_model.strip()
+        logger.warning(f"Attempting fallback Gemini model '{fallback_model}'...")
+        try:
+            return _call_gemini_model_with_retries(client, fallback_model, system_instruction, question)
+        except Exception as e:
+            last_error = e
+            logger.error(f"Fallback Gemini model '{fallback_model}' exhausted retries: {e}")
+
+    # 3. Log details to server log and return friendly message
+    logger.error(f"All Gemini models and retries exhausted. Raw error details: {last_error}", exc_info=True)
+    raise RuntimeError("The AI service is busy right now. Please try again in a moment.")
 
 
 async def process_copilot_ask(question: str, role: str) -> Dict[str, Any]:
@@ -313,12 +385,12 @@ async def process_copilot_ask(question: str, role: str) -> Dict[str, Any]:
         logger.error(f"[Gemini API Call Failed]: {e}")
         return {
             "status": "error",
-            "answer": f"Gemini API request failed: {str(e)}",
+            "answer": "The AI service is busy right now. Please try again in a moment.",
             "columns": [],
             "rows": [],
             "sql": "-- Error communicating with Gemini API",
             "blocked_layer": "llm",
-            "blocked_reason": str(e),
+            "blocked_reason": "The AI service is busy right now. Please try again in a moment.",
             "row_count": 0,
             "duration_ms": int((time.time() - start_time) * 1000),
             "tables_used": [],

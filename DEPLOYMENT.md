@@ -43,6 +43,7 @@ In your **Render Dashboard** ➔ **Your Service** ➔ **Environment**:
 | `SUPABASE_URL` | `https://<your-project-ref>.supabase.co` | Your Supabase project URL (Project Settings ➔ API) |
 | `SUPABASE_SERVICE_ROLE_KEY` | `<your-service-role-key>` | Service role secret key (bypasses RLS for server) |
 | `GEMINI_API_KEY` | `<your-gemini-api-key>` | Google AI Studio key for Copilot text-to-SQL |
+| `GEMINI_FALLBACK_MODEL` | `gemini-1.5-flash` | *(Optional)* Resilient fallback model if primary Gemini model returns 503/429/timeout |
 | `JWT_SECRET` | *(Render auto-generates)* | Set via `generateValue: true` in `render.yaml` |
 | `ALLOWED_ORIGIN` | `https://<your-service-name>.onrender.com` | Live Render service origin for CORS guard |
 
