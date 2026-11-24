@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   CalendarDays,
-  Sparkles,
   RefreshCw,
   UserX,
   Plus,
@@ -91,7 +90,7 @@ export const TimetableView: React.FC = () => {
       from_slot: `${oldDay} ${oldSlot} (${session.room})`,
       to_slot: `${targetDay} ${newStart} - ${newEnd} (${session.room})`,
       reason: hasConflict
-        ? `⚠️ Potential trainer/room overlap warning.`
+        ? `ΓÜá∩╕Å Potential trainer/room overlap warning.`
         : `Manually rescheduled to ${targetDay} ${newStart} with 0 conflicts.`,
     };
 
@@ -226,7 +225,7 @@ export const TimetableView: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text">
               Timetable Grid
             </h1>
             {timetable && (
@@ -236,31 +235,31 @@ export const TimetableView: React.FC = () => {
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Weekly multi-resource scheduling engine across Mon–Sat, 5 physical labs, and 8 trainers.
+          <p className="text-xs text-text-muted mt-0.5">
+            Weekly multi-resource scheduling engine across MonΓÇôSat, 5 physical labs, and 8 trainers.
           </p>
         </div>
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
           {timetable?.changes && timetable.changes.length > 0 && (
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/60">
+            <div className="flex items-center bg-surface-muted p-0.5 rounded-[6px] border border-border/60">
               <button
                 onClick={() => setViewMode('after')}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all cursor-pointer ${
                   viewMode === 'after'
-                    ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-surface text-text  font-semibold'
+                    : 'text-text-muted hover:text-text'
                 }`}
               >
                 Re-Planned
               </button>
               <button
                 onClick={() => setViewMode('before')}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all cursor-pointer ${
                   viewMode === 'before'
-                    ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-surface text-text  font-semibold'
+                    : 'text-text-muted hover:text-text'
                 }`}
               >
                 Base View
@@ -271,7 +270,7 @@ export const TimetableView: React.FC = () => {
           <button
             onClick={handleFreshGenerate}
             disabled={loading}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-medium shadow-2xs transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-[6px] bg-surface border border-border text-text-muted hover:bg-surface-subtle text-xs font-medium  transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Re-solve
@@ -279,7 +278,7 @@ export const TimetableView: React.FC = () => {
 
           <button
             onClick={() => setIsUnavailableModalOpen(true)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 hover:bg-amber-100 text-xs font-medium shadow-2xs transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-[6px] bg-amber-50 border border-amber-200 text-amber-900 hover:bg-amber-100 text-xs font-medium  transition-colors cursor-pointer"
           >
             <UserX className="w-3.5 h-3.5 text-amber-700" />
             Trainer Unavailable
@@ -287,7 +286,7 @@ export const TimetableView: React.FC = () => {
 
           <button
             onClick={() => setIsAddBatchModalOpen(true)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-xs font-medium shadow-2xs transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-[6px] bg-accent text-white hover:bg-indigo-700 text-xs font-medium  transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             Add Batch
@@ -295,48 +294,48 @@ export const TimetableView: React.FC = () => {
         </div>
       </div>
 
-      {/* 4-Pillar Clash-Free Solver Constraints Telemetry */}
+      {/* Schedule Constraints */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-indigo-50 text-indigo-700 shrink-0">
+        <div className="p-3 bg-surface rounded-[6px] border border-border  flex items-center gap-3">
+          <div className="p-2 rounded-[6px] bg-accent-subtle text-accent shrink-0">
             <Users className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Trainer Availability</div>
-            <div className="text-xs font-semibold text-slate-800 truncate">8 / 8 Active Mentors</div>
+            <div className="text-[10px] uppercase font-bold tracking-wider text-text-subtle">Trainer Availability</div>
+            <div className="text-xs font-semibold text-text truncate">8 / 8 Active Mentors</div>
             <div className="text-[10px] text-emerald-600 font-medium">0 Double-bookings</div>
           </div>
         </div>
 
-        <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-amber-50 text-amber-700 shrink-0">
+        <div className="p-3 bg-surface rounded-[6px] border border-border  flex items-center gap-3">
+          <div className="p-2 rounded-[6px] bg-amber-50 text-amber-700 shrink-0">
             <Building className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Room Capacity</div>
-            <div className="text-xs font-semibold text-slate-800 truncate">5 Labs & Halls</div>
-            <div className="text-[10px] text-emerald-600 font-medium">Capacities 30–45 verified</div>
+            <div className="text-[10px] uppercase font-bold tracking-wider text-text-subtle">Room Capacity</div>
+            <div className="text-xs font-semibold text-text truncate">5 Labs & Halls</div>
+            <div className="text-[10px] text-emerald-600 font-medium">Capacities 30ΓÇô45 verified</div>
           </div>
         </div>
 
-        <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-purple-50 text-purple-700 shrink-0">
+        <div className="p-3 bg-surface rounded-[6px] border border-border  flex items-center gap-3">
+          <div className="p-2 rounded-[6px] bg-purple-50 text-purple-700 shrink-0">
             <Clock className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Batch Timings</div>
-            <div className="text-xs font-semibold text-slate-800 truncate">4 Non-Overlap Bands</div>
+            <div className="text-[10px] uppercase font-bold tracking-wider text-text-subtle">Batch Timings</div>
+            <div className="text-xs font-semibold text-text truncate">4 Non-Overlap Bands</div>
             <div className="text-[10px] text-emerald-600 font-medium">30m Buffer Enforced</div>
           </div>
         </div>
 
-        <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-cyan-50 text-cyan-700 shrink-0">
+        <div className="p-3 bg-surface rounded-[6px] border border-border  flex items-center gap-3">
+          <div className="p-2 rounded-[6px] bg-cyan-50 text-cyan-700 shrink-0">
             <Wifi className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Online Seat Limits</div>
-            <div className="text-xs font-semibold text-slate-800 truncate">WebRTC / LiveKit</div>
+            <div className="text-[10px] uppercase font-bold tracking-wider text-text-subtle">Online Seat Limits</div>
+            <div className="text-xs font-semibold text-text truncate">WebRTC / LiveKit</div>
             <div className="text-[10px] text-emerald-600 font-medium">62 / 100 Seats in Use</div>
           </div>
         </div>
@@ -345,16 +344,16 @@ export const TimetableView: React.FC = () => {
       {/* Main Container: Grid + Change Log */}
       <div className="flex flex-col xl:flex-row gap-5 items-start">
         {/* Weekly Grid */}
-        <div className="flex-1 w-full bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+        <div className="flex-1 w-full bg-surface rounded-[6px] border border-border  overflow-hidden">
           <div className="overflow-x-auto">
             <div className="min-w-[720px]">
               {/* Day Headers */}
-              <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-semibold text-slate-700 uppercase tracking-wide">
-                <div className="py-2.5 px-2 border-r border-slate-200 bg-slate-100/50 text-slate-500 text-[11px]">
+              <div className="grid grid-cols-7 border-b border-border bg-surface-subtle text-center text-xs font-semibold text-text-muted uppercase tracking-wide">
+                <div className="py-2.5 px-2 border-r border-border bg-surface-muted/50 text-text-muted text-[11px]">
                   Time Slot
                 </div>
                 {WEEKDAYS.map(day => (
-                  <div key={day} className="py-2.5 px-2 border-r border-slate-200 last:border-r-0 text-[11px]">
+                  <div key={day} className="py-2.5 px-2 border-r border-border last:border-r-0 text-[11px]">
                     {day}
                   </div>
                 ))}
@@ -365,8 +364,8 @@ export const TimetableView: React.FC = () => {
                 {TIME_SLOTS.map(slot => (
                   <div key={slot} className="grid grid-cols-7 min-h-[105px]">
                     {/* Time Column */}
-                    <div className="p-2 border-r border-slate-200 bg-slate-50/40 flex flex-col justify-center text-center font-mono text-[10px] text-slate-500">
-                      <Clock className="w-3 h-3 mx-auto mb-0.5 text-slate-400" />
+                    <div className="p-2 border-r border-border bg-surface-subtle/40 flex flex-col justify-center text-center font-mono text-[10px] text-text-muted">
+                      <Clock className="w-3 h-3 mx-auto mb-0.5 text-text-subtle" />
                       {slot}
                     </div>
 
@@ -388,8 +387,8 @@ export const TimetableView: React.FC = () => {
                             e.preventDefault();
                             handleDropSession(day, slot);
                           }}
-                          className={`p-1.5 border-r border-slate-100 last:border-r-0 space-y-1.5 transition-colors ${
-                            isDragOver ? 'bg-indigo-50 border-indigo-300 ring-1 ring-indigo-400' : 'bg-white'
+                          className={`p-1.5 border-r border-border last:border-r-0 space-y-1.5 transition-colors ${
+                            isDragOver ? 'bg-accent-subtle border-indigo-300 ring-1 ring-indigo-400' : 'bg-surface'
                           }`}
                         >
                           {sessions.map(sess => {
@@ -402,14 +401,14 @@ export const TimetableView: React.FC = () => {
                                 draggable
                                 onDragStart={() => setDraggingSessionId(sess.id)}
                                 onDragEnd={() => setDraggingSessionId(null)}
-                                className={`rounded-lg p-2 text-xs border transition-all cursor-grab active:cursor-grabbing select-none ${
-                                  sess.color_code || 'bg-slate-50 border-slate-200'
+                                className={`rounded-[6px] p-2 text-xs border transition-all cursor-grab active:cursor-grabbing select-none ${
+                                  sess.color_code || 'bg-surface-subtle border-border'
                                 } ${
                                   isDragging ? 'opacity-40 scale-95' : ''
                                 } ${
                                   isMoved && viewMode === 'after'
                                     ? 'border-l-4 border-l-amber-500 bg-amber-50/60'
-                                    : 'shadow-2xs hover:shadow-xs'
+                                    : ' hover:'
                                 }`}
                               >
                                 <div className="flex items-center justify-between mb-0.5">
@@ -418,27 +417,27 @@ export const TimetableView: React.FC = () => {
                                       RE-PLANNED
                                     </span>
                                   ) : (
-                                    <span className="text-[9px] font-mono text-slate-400 uppercase">
+                                    <span className="text-[9px] font-mono text-text-subtle uppercase">
                                       {sess.mode}
                                     </span>
                                   )}
-                                  <GripVertical className="w-3 h-3 text-slate-400 hover:text-slate-600 shrink-0" />
+                                  <GripVertical className="w-3 h-3 text-text-subtle hover:text-text-muted shrink-0" />
                                 </div>
 
-                                <div className="font-semibold text-slate-900 text-[11px] leading-tight">
+                                <div className="font-semibold text-text text-[11px] leading-tight">
                                   {sess.batch}
                                 </div>
 
-                                <div className="text-[10px] text-slate-600 mt-0.5">
+                                <div className="text-[10px] text-text-muted mt-0.5">
                                   {sess.trainer}
                                 </div>
 
-                                <div className="text-[10px] text-slate-400 mt-0.5 flex items-center justify-between gap-1 truncate">
+                                <div className="text-[10px] text-text-subtle mt-0.5 flex items-center justify-between gap-1 truncate">
                                   <div className="flex items-center gap-1 truncate">
                                     <Building className="w-2.5 h-2.5 shrink-0" />
                                     <span className="truncate">{sess.room}</span>
                                   </div>
-                                  <span className="text-[9px] font-mono font-medium text-slate-600 bg-slate-200/60 px-1 rounded shrink-0">
+                                  <span className="text-[9px] font-mono font-medium text-text-muted bg-slate-200/60 px-1 rounded shrink-0">
                                     {sess.mode === 'online' ? 'WebRTC: 28/100' : 'Cap: 30/35'}
                                   </span>
                                 </div>
@@ -457,10 +456,10 @@ export const TimetableView: React.FC = () => {
 
         {/* Change Log Panel */}
         {timetable?.changes && timetable.changes.length > 0 && (
-          <div className="w-full xl:w-80 bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden shrink-0">
+          <div className="w-full xl:w-80 bg-surface rounded-[6px] border border-border  overflow-hidden shrink-0">
             <div className="p-3 bg-amber-50/70 border-b border-amber-200/80 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-700" />
+                <CalendarDays className="w-4 h-4" strokeWidth={1.5} />
                 <h3 className="font-semibold text-xs text-amber-950">Re-Plan Log</h3>
               </div>
               <span className="text-[10px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
@@ -469,7 +468,7 @@ export const TimetableView: React.FC = () => {
             </div>
 
             <div className="p-3 space-y-3">
-              <p className="text-[11px] text-slate-500 leading-relaxed">
+              <p className="text-[11px] text-text-muted leading-relaxed">
                 Sessions shifted to zero-contention slots automatically:
               </p>
 
@@ -477,12 +476,12 @@ export const TimetableView: React.FC = () => {
                 {timetable.changes.map((change, idx) => (
                   <div
                     key={idx}
-                    className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1.5"
+                    className="p-2.5 rounded-[6px] bg-surface-subtle border border-border text-xs space-y-1.5"
                   >
-                    <div className="font-semibold text-slate-900 text-[11px]">{change.session}</div>
+                    <div className="font-semibold text-text text-[11px]">{change.session}</div>
 
                     <div className="flex items-center gap-1.5 text-[10px] font-mono">
-                      <span className="text-slate-400 line-through truncate max-w-[100px]">
+                      <span className="text-text-subtle line-through truncate max-w-[100px]">
                         {change.from_slot}
                       </span>
                       <ArrowRight className="w-3 h-3 text-amber-600 shrink-0" />
@@ -491,14 +490,14 @@ export const TimetableView: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="text-[10px] text-slate-600 bg-amber-50 p-1.5 rounded border border-amber-100">
+                    <div className="text-[10px] text-text-muted bg-amber-50 p-1.5 rounded border border-amber-100">
                       {change.reason}
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+              <div className="pt-2 border-t border-border flex items-center justify-between text-[10px] text-text-subtle">
                 <span>Run: {timetable.run_id}</span>
                 <span className="font-semibold text-emerald-600">0 clashes</span>
               </div>
@@ -516,11 +515,11 @@ export const TimetableView: React.FC = () => {
       >
         <form onSubmit={handleMarkUnavailable} className="space-y-3.5 text-xs">
           <div>
-            <label className="block font-semibold text-slate-700 uppercase mb-1 text-[11px]">Trainer</label>
+            <label className="block font-semibold text-text-muted uppercase mb-1 text-[11px]">Trainer</label>
             <select
               value={unavailTrainer}
               onChange={e => setUnavailTrainer(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-indigo-500"
+              className="w-full px-3 py-2 rounded-[6px] border border-border text-xs focus:outline-hidden focus:border-indigo-500"
             >
               {trainers.map(t => (
                 <option key={t.id} value={t.name}>
@@ -532,11 +531,11 @@ export const TimetableView: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 uppercase mb-1 text-[11px]">Weekday</label>
+              <label className="block font-semibold text-text-muted uppercase mb-1 text-[11px]">Weekday</label>
               <select
                 value={unavailDay}
                 onChange={e => setUnavailDay(e.target.value as Weekday)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-indigo-500"
+                className="w-full px-3 py-2 rounded-[6px] border border-border text-xs focus:outline-hidden focus:border-indigo-500"
               >
                 {WEEKDAYS.map(w => (
                   <option key={w} value={w}>
@@ -547,11 +546,11 @@ export const TimetableView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-700 uppercase mb-1 text-[11px]">Time Range</label>
+              <label className="block font-semibold text-text-muted uppercase mb-1 text-[11px]">Time Range</label>
               <select
                 value={unavailTime}
                 onChange={e => setUnavailTime(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-indigo-500"
+                className="w-full px-3 py-2 rounded-[6px] border border-border text-xs focus:outline-hidden focus:border-indigo-500"
               >
                 <option value="Full Day">Full Day (All Slots)</option>
                 <option value="Morning (09:00 - 13:00)">Morning (09:00 - 13:00)</option>
@@ -560,21 +559,21 @@ export const TimetableView: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-200 text-amber-900 text-[11px]">
+          <div className="p-2.5 bg-amber-50 rounded-[6px] border border-amber-200 text-amber-900 text-[11px]">
             Marking <strong>{unavailTrainer}</strong> unavailable on <strong>{unavailDay}</strong> will shift affected classes with zero room/trainer clashes.
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex justify-end gap-2 pt-2 border-t border-border">
             <button
               type="button"
               onClick={() => setIsUnavailableModalOpen(false)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 cursor-pointer"
+              className="px-3 py-1.5 rounded-[6px] border border-border text-text-muted font-medium hover:bg-surface-subtle cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-3.5 py-1.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-[6px] bg-amber-600 text-white font-medium hover:bg-amber-700 cursor-pointer"
             >
               Trigger Auto Re-Plan
             </button>
@@ -591,23 +590,23 @@ export const TimetableView: React.FC = () => {
       >
         <form onSubmit={handleAddBatchSession} className="space-y-3.5 text-xs">
           <div>
-            <label className="block font-semibold text-slate-700 uppercase mb-1 text-[11px]">Batch Name</label>
+            <label className="block font-semibold text-text-muted uppercase mb-1 text-[11px]">Batch Name</label>
             <input
               type="text"
               required
               value={newBatchName}
               onChange={e => setNewBatchName(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-indigo-500"
+              className="w-full px-3 py-2 rounded-[6px] border border-border text-xs focus:outline-hidden focus:border-indigo-500"
               placeholder="e.g. AI Engineer Sprint Cohort"
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 uppercase mb-1 text-[11px]">Trainer</label>
+            <label className="block font-semibold text-text-muted uppercase mb-1 text-[11px]">Trainer</label>
             <select
               value={newBatchTrainer}
               onChange={e => setNewBatchTrainer(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-indigo-500"
+              className="w-full px-3 py-2 rounded-[6px] border border-border text-xs focus:outline-hidden focus:border-indigo-500"
             >
               {trainers.map(t => (
                 <option key={t.id} value={t.name}>
@@ -619,11 +618,11 @@ export const TimetableView: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 uppercase mb-1 text-[11px]">Target Day</label>
+              <label className="block font-semibold text-text-muted uppercase mb-1 text-[11px]">Target Day</label>
               <select
                 value={newBatchDay}
                 onChange={e => setNewBatchDay(e.target.value as Weekday)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-indigo-500"
+                className="w-full px-3 py-2 rounded-[6px] border border-border text-xs focus:outline-hidden focus:border-indigo-500"
               >
                 {WEEKDAYS.map(w => (
                   <option key={w} value={w}>
@@ -634,11 +633,11 @@ export const TimetableView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-700 uppercase mb-1 text-[11px]">Classroom</label>
+              <label className="block font-semibold text-text-muted uppercase mb-1 text-[11px]">Classroom</label>
               <select
                 value={newBatchRoom}
                 onChange={e => setNewBatchRoom(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-indigo-500"
+                className="w-full px-3 py-2 rounded-[6px] border border-border text-xs focus:outline-hidden focus:border-indigo-500"
               >
                 <option value="Seminar Hall 4 - Delta">Seminar Hall 4 - Delta</option>
                 <option value="Lab 1 - Alpha">Lab 1 - Alpha</option>
@@ -648,17 +647,17 @@ export const TimetableView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex justify-end gap-2 pt-2 border-t border-border">
             <button
               type="button"
               onClick={() => setIsAddBatchModalOpen(false)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 cursor-pointer"
+              className="px-3 py-1.5 rounded-[6px] border border-border text-text-muted font-medium hover:bg-surface-subtle cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-[6px] bg-accent text-white font-medium hover:bg-indigo-700 cursor-pointer"
             >
               Solve & Schedule
             </button>
@@ -668,3 +667,8 @@ export const TimetableView: React.FC = () => {
     </div>
   );
 };
+
+
+
+
+

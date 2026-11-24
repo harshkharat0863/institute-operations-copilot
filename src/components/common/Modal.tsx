@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
-interface ModalProps {
+export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
@@ -37,39 +37,49 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   const maxWidthClass = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
-    '2xl': 'max-w-2xl',
+    sm: 'sm:max-w-sm',
+    md: 'sm:max-w-md',
+    lg: 'sm:max-w-lg',
+    xl: 'sm:max-w-xl',
+    '2xl': 'sm:max-w-2xl',
   }[maxWidth];
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
-        {/* Backdrop */}
-        <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
-          onClick={onClose}
-        />
+    <div className="fixed inset-0 z-50 overflow-y-auto sm:overflow-hidden flex items-end sm:items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/40 backdrop-blur-[1px] transition-opacity"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
-        {/* Modal Dialog Card */}
-        <div
-          className={`relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 w-full ${maxWidthClass} border border-slate-200 z-10 animate-in fade-in zoom-in-95 duration-150`}
-        >
-          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-              {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
-            </div>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      {/* Modal / Bottom Sheet Container */}
+      <div
+        className={`relative z-10 w-full ${maxWidthClass} bg-surface text-left shadow-xl transition-all border-t sm:border border-border rounded-t-[16px] sm:rounded-[8px] max-h-[92dvh] sm:max-h-[85vh] flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] sm:pb-0`}
+      >
+        {/* Mobile drag bar */}
+        <div className="sm:hidden pt-2.5 pb-1 flex justify-center shrink-0">
+          <div className="w-10 h-1 rounded-full bg-border" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border px-4 sm:px-5 py-3 sm:py-3.5 shrink-0">
+          <div>
+            <h3 className="font-serif text-base sm:text-lg font-medium text-text">{title}</h3>
+            {description && <p className="text-xs text-text-muted mt-0.5">{description}</p>}
           </div>
-          <div className="px-6 py-5">{children}</div>
+          <button
+            onClick={onClose}
+            className="rounded-[4px] p-1.5 text-text-muted hover:bg-surface-subtle hover:text-text transition-colors cursor-pointer shrink-0"
+            aria-label="Close dialog"
+          >
+            <X className="w-4 h-4" strokeWidth={1.5} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-4 sm:px-5 py-4 overflow-y-auto flex-1 overscroll-contain">
+          {children}
         </div>
       </div>
     </div>

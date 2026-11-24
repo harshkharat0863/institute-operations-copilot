@@ -2,9 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Bot,
   Send,
-  Sparkles,
   ShieldAlert,
-  Database,
   Copy,
   Check,
   ChevronDown,
@@ -12,21 +10,20 @@ import {
   MessageSquare,
   AlertTriangle,
   ArrowRight,
-  Clock,
   Table as TableIcon,
   RefreshCw,
-  Info,
   Calendar,
   IndianRupee,
   Users,
   CheckCircle2,
-  FileCheck,
+  Award,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { api } from '../../lib/api';
 import { CopilotAskResponse, PendingActionDraft } from '../../types';
-import { Badge, BadgeVariant } from '../common/Badge';
+import { Badge } from '../common/Badge';
+import { Button } from '../common/Button';
 
 interface CopilotMessage {
   id: string;
@@ -47,15 +44,15 @@ interface PromptCategory {
 const CATEGORIZED_PROMPTS: PromptCategory[] = [
   {
     id: 'benchmark',
-    label: '⭐ Benchmark Query',
-    icon: Sparkles,
+    label: 'Benchmark Scenario',
+    icon: Award,
     queries: [
       'Which students in the Java batch have missed three or more classes and have an EMI due this week? Draft a WhatsApp reminder for each.',
     ],
   },
   {
     id: 'attendance',
-    label: 'A. Attendance',
+    label: 'Attendance',
     icon: CheckCircle2,
     queries: [
       'Show students who missed three or more classes this month.',
@@ -65,7 +62,7 @@ const CATEGORIZED_PROMPTS: PromptCategory[] = [
   },
   {
     id: 'fees',
-    label: 'B. Fees & EMIs',
+    label: 'Fees & EMIs',
     icon: IndianRupee,
     queries: [
       'Which EMIs are due this week?',
@@ -75,7 +72,7 @@ const CATEGORIZED_PROMPTS: PromptCategory[] = [
   },
   {
     id: 'timetable',
-    label: 'C. Timetable & Clashes',
+    label: 'Timetable',
     icon: Calendar,
     queries: [
       "Show tomorrow's timetable.",
@@ -85,7 +82,7 @@ const CATEGORIZED_PROMPTS: PromptCategory[] = [
   },
   {
     id: 'risk',
-    label: 'D. Risk Detection',
+    label: 'Risk Detection',
     icon: Users,
     queries: [
       'Which students may be falling behind?',
@@ -95,7 +92,7 @@ const CATEGORIZED_PROMPTS: PromptCategory[] = [
   },
   {
     id: 'comms',
-    label: 'E. Communication & Drafts',
+    label: 'Communication Drafts',
     icon: MessageSquare,
     queries: [
       'Draft a WhatsApp reminder for students whose fees are due.',
@@ -120,7 +117,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
       id: 'welcome_msg',
       sender: 'assistant',
       timestamp: new Date().toISOString(),
-      text: `Hello ${user?.name}! I am your Institute Operations Copilot — a real database bridge connected to students, cohorts, attendance logs, fee installments, trainers, and timetable slots. Ask any operational question in natural language below.`,
+      text: `Ask any question about students, batches, attendance, fee installments, or timetable schedules.`,
     },
   ]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -196,24 +193,24 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
         )
       );
 
-      // Auto expand query inspector
       setExpandedQueries(prev => ({
         ...prev,
         [assistantMsgId]: true,
       }));
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Server error';
       setMessages(prev =>
         prev.map(m =>
           m.id === assistantMsgId
             ? {
                 ...m,
                 isLoading: false,
-                text: `An error occurred while compiling your request: ${err.message || 'Server error'}`,
+                text: `An error occurred while compiling your request: ${msg}`,
               }
             : m
         )
       );
-      showToast(err.message || 'Copilot query execution failed', 'error');
+      showToast(msg, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -232,51 +229,49 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
         user?.name || 'Staff Member'
       );
       showToast(
-        `Drafted ${actions.length} WhatsApp reminders. Staged in Approvals Queue for human verification.`,
+        `Drafted ${actions.length} WhatsApp reminders. Staged in Approvals Queue for verification.`,
         'success',
         'Staged for Approval'
       );
       onNavigateToApprovals();
-    } catch (err: any) {
-      showToast(err.message || 'Could not draft reminders', 'error');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not draft reminders';
+      showToast(msg, 'error');
     }
   };
 
   const activeCategoryObj = CATEGORIZED_PROMPTS.find(c => c.id === selectedCategory) || CATEGORIZED_PROMPTS[0];
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7.5rem)] bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+    <div className="flex flex-col h-[calc(100dvh-11rem)] lg:h-[calc(100dvh-7rem)] bg-surface rounded-[8px] border border-border overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-3 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shrink-0">
-            <Bot className="w-4 h-4" />
+      <div className="px-4 py-3 border-b border-border bg-surface flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-[6px] bg-accent flex items-center justify-center text-white shrink-0">
+            <Bot className="w-4 h-4" strokeWidth={1.5} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-slate-900 text-sm">
-                Operations Copilot
+              <h2 className="font-serif text-sm font-medium text-text">
+                Copilot
               </h2>
-              <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
-                Read-Only AST
-              </span>
             </div>
-            <p className="text-xs text-slate-500">
-              Role-verified access · Context: <span className="font-semibold capitalize text-slate-700">{role}</span>
+            <p className="text-[11px] text-text-muted">
+              Role: <span className="font-medium capitalize text-text">{role}</span>
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-medium bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-md">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Read-Only Guard
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-status-green font-medium bg-status-green-bg border border-status-green/20 px-2 py-0.5 rounded-[4px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-status-green" />
+            Readonly Role (3s timeout)
           </span>
         </div>
       </div>
 
       {/* Suggested Prompts & Tabs */}
-      <div className="bg-slate-50/70 border-b border-slate-200 px-4 py-2 shrink-0 space-y-2">
+      <div className="bg-surface-subtle border-b border-border px-4 py-2 shrink-0 space-y-2">
         {/* Category Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
           {CATEGORIZED_PROMPTS.map(cat => {
@@ -286,13 +281,13 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
                   isSelected
-                    ? 'bg-slate-900 text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    ? 'bg-accent text-white'
+                    : 'text-text-muted hover:text-text hover:bg-surface'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
                 {cat.label}
               </button>
             );
@@ -301,15 +296,15 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
 
         {/* Quick Queries */}
         <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 text-xs">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">
-            Quick Prompts:
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-text-subtle shrink-0">
+            Suggested:
           </span>
           {activeCategoryObj.queries.map((q, idx) => (
             <button
               key={idx}
               onClick={() => handleAsk(q)}
               disabled={isSubmitting}
-              className="text-xs text-slate-700 bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 px-2.5 py-1 rounded-md whitespace-nowrap transition-colors disabled:opacity-50 cursor-pointer text-left"
+              className="text-xs text-text-muted hover:text-text bg-surface border border-border hover:border-accent px-2.5 py-1 rounded-[6px] whitespace-nowrap transition-colors disabled:opacity-50 cursor-pointer text-left"
             >
               {q}
             </button>
@@ -318,7 +313,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
       </div>
 
       {/* Messages Thread */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/30">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-bg">
         {messages.map(msg => {
           const isUser = msg.sender === 'user';
           const resp = msg.response;
@@ -330,25 +325,25 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
           return (
             <div
               key={msg.id}
-              className={`flex gap-3 max-w-4xl ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
+              className={`flex gap-3 max-w-[90vw] sm:max-w-2xl lg:max-w-4xl ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
             >
               {/* Avatar */}
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-semibold ${
+                className={`w-6 h-6 rounded-[4px] flex items-center justify-center shrink-0 text-xs font-medium ${
                   isUser
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-white text-slate-700 border border-slate-200'
+                    ? 'bg-accent text-white'
+                    : 'bg-surface text-text border border-border'
                 }`}
               >
-                {isUser ? user?.name?.charAt(0) || 'U' : <Bot className="w-3.5 h-3.5" />}
+                {isUser ? user?.name?.charAt(0) || 'U' : <Bot className="w-3.5 h-3.5" strokeWidth={1.5} />}
               </div>
 
               {/* Message Body */}
               <div
-                className={`flex-1 rounded-xl p-4 text-xs ${
+                className={`flex-1 rounded-[8px] p-3.5 text-xs ${
                   isUser
-                    ? 'bg-indigo-600 text-white leading-relaxed text-sm'
-                    : 'bg-white border border-slate-200 text-slate-800 space-y-3 shadow-2xs'
+                    ? 'bg-accent text-white leading-relaxed'
+                    : 'bg-surface border border-border text-text space-y-3'
                 }`}
               >
                 {/* User Message */}
@@ -357,52 +352,46 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
                 {/* Loading Indicator */}
                 {!isUser && msg.isLoading && (
                   <div className="space-y-2 py-1">
-                    <div className="flex items-center gap-2 text-xs text-indigo-600 font-medium">
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      Analyzing request, verifying role schema boundaries...
+                    <div className="flex items-center gap-2 text-xs text-accent font-medium">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" strokeWidth={1.5} />
+                      Analyzing request and generating verified SQL AST...
                     </div>
-                    <div className="h-3 bg-slate-100 rounded w-2/3 animate-pulse" />
+                    <div className="h-3 bg-surface-muted rounded-[4px] w-2/3 animate-pulse" />
                   </div>
                 )}
 
                 {/* Plain Text Reply */}
                 {!isUser && !msg.isLoading && msg.text && (
-                  <p className="text-xs sm:text-sm leading-relaxed text-slate-700">{msg.text}</p>
+                  <p className="text-xs leading-relaxed text-text-muted">{msg.text}</p>
                 )}
 
                 {/* Structured Copilot Response */}
                 {!isUser && !msg.isLoading && resp && (
                   <div className="space-y-3 text-xs">
-                    
                     {/* Operation Pill */}
                     {resp.operation && (
-                      <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-md bg-slate-50 border border-slate-200">
-                        <span className="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">
-                          Approved Function:
+                      <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-[6px] bg-surface-subtle border border-border">
+                        <span className="font-semibold text-text-subtle uppercase tracking-wider text-[10px]">
+                          Operation:
                         </span>
-                        <code className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-indigo-700 font-mono text-[11px] font-semibold">
+                        <code className="px-1.5 py-0.5 rounded-[4px] bg-surface border border-border text-accent font-mono text-[11px] font-semibold">
                           {resp.operation}
                         </code>
                         {resp.category && (
-                          <Badge variant="info" size="sm">
+                          <Badge variant="accent" size="sm">
                             {resp.category}
                           </Badge>
-                        )}
-                        {resp.operation_payload && (
-                          <span className="text-[10px] font-mono text-slate-400 ml-auto truncate max-w-[240px]">
-                            {JSON.stringify(resp.operation_payload)}
-                          </span>
                         )}
                       </div>
                     )}
 
                     {/* Summary Answer */}
                     <div className="flex items-start justify-between gap-3">
-                      <p className="text-xs sm:text-sm font-medium text-slate-900 leading-relaxed">
+                      <p className="text-xs font-medium text-text leading-relaxed">
                         {resp.answer}
                       </p>
                       {resp.status === 'ok' && resp.row_count > 0 && (
-                        <span className="shrink-0 px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
+                        <span className="shrink-0 px-2 py-0.5 text-[10px] font-medium bg-status-green-bg text-status-green border border-status-green/20 rounded-[4px] tabular-nums">
                           {resp.row_count} rows
                         </span>
                       )}
@@ -410,15 +399,15 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
 
                     {/* Blocked Alert */}
                     {isBlocked && (
-                      <div className="p-3.5 rounded-lg bg-rose-50 border-l-4 border-l-rose-500 border border-rose-200 text-rose-900 space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
-                          <span className="font-semibold text-xs">Role Permission Refusal</span>
-                          <span className="ml-auto text-[10px] font-mono text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded">
+                      <div className="p-3 rounded-[6px] bg-status-red-bg border border-status-red/20 text-status-red space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <ShieldAlert className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+                          <span className="font-semibold text-xs">Access Refusal</span>
+                          <span className="ml-auto text-[10px] font-mono bg-surface px-1.5 py-0.5 rounded-[4px] border border-status-red/20">
                             {resp.blocked_layer || 'Role View'}
                           </span>
                         </div>
-                        <p className="text-xs text-rose-800 leading-relaxed">
+                        <p className="text-xs leading-relaxed opacity-90">
                           {resp.blocked_reason}
                         </p>
                       </div>
@@ -426,20 +415,20 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
 
                     {/* Partial Refusal */}
                     {isPartial && (
-                      <div className="p-2.5 rounded-md bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2 text-xs">
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="p-2.5 rounded-[6px] bg-status-amber-bg border border-status-amber/20 text-status-amber flex items-start gap-2 text-xs">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" strokeWidth={1.5} />
                         <div>
-                          <strong className="font-semibold">Security Redaction:</strong> {resp.partial_explanation}
+                          <strong className="font-semibold">Redaction:</strong> {resp.partial_explanation}
                         </div>
                       </div>
                     )}
 
                     {/* Verifiable Table */}
                     {resp.rows && resp.rows.length > 0 && (
-                      <div className="rounded-lg border border-slate-200 overflow-hidden">
+                      <div className="rounded-[6px] border border-border overflow-hidden">
                         <div className="overflow-x-auto max-h-64">
-                          <table className="w-full text-left border-collapse text-xs">
-                            <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-500 font-semibold text-[11px]">
+                          <table className="w-full text-left border-collapse text-xs tabular-nums">
+                            <thead className="bg-surface-subtle sticky top-0 border-b border-border text-text-muted font-medium text-[11px] uppercase tracking-wider">
                               <tr>
                                 {resp.columns.map((col, idx) => (
                                   <th key={idx} className="py-2 px-3 whitespace-nowrap">
@@ -448,11 +437,11 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
                                 ))}
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-border">
                               {resp.rows.map((row, rIdx) => (
-                                <tr key={rIdx} className="hover:bg-slate-50/70">
-                                  {row.map((cell: any, cIdx: number) => (
-                                    <td key={cIdx} className="py-2 px-3 text-slate-800 whitespace-nowrap">
+                                <tr key={rIdx} className="hover:bg-surface-subtle/50 text-text">
+                                  {row.map((cell: unknown, cIdx: number) => (
+                                    <td key={cIdx} className="py-2 px-3 whitespace-nowrap">
                                       {String(cell)}
                                     </td>
                                   ))}
@@ -466,47 +455,49 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
 
                     {/* Human Approval Message Drafts */}
                     {resp.can_draft_reminders && resp.generated_actions && (
-                      <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-lg space-y-2.5">
+                      <div className="p-3 bg-surface-subtle border border-border rounded-[6px] space-y-2.5">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div>
-                            <div className="font-semibold text-xs text-emerald-950 flex items-center gap-1.5">
-                              <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
+                            <div className="font-semibold text-xs text-text flex items-center gap-1.5">
+                              <MessageSquare className="w-3.5 h-3.5 text-accent" strokeWidth={1.5} />
                               WhatsApp Action Staging
                             </div>
-                            <div className="text-[11px] text-emerald-800">
-                              {resp.generated_actions.length} message drafts prepared. Requires review before dispatch.
+                            <div className="text-[11px] text-text-muted">
+                              {resp.generated_actions.length} message drafts prepared from query results.
                             </div>
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <button
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               onClick={() => toggleDrafts(msg.id)}
-                              className="px-2.5 py-1 rounded border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-900 text-xs font-medium cursor-pointer"
                             >
-                              {isDraftsExpanded ? 'Hide Previews' : 'Preview'}
-                            </button>
-                            <button
+                              {isDraftsExpanded ? 'Hide' : 'Preview'}
+                            </Button>
+                            <Button
+                              variant="primary"
+                              size="sm"
                               onClick={() => handleDraftReminders(resp.generated_actions)}
-                              className="flex items-center gap-1 px-3 py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold cursor-pointer shadow-2xs"
+                              icon={<ArrowRight className="w-3 h-3" strokeWidth={1.5} />}
                             >
-                              <span>Stage to Approvals</span>
-                              <ArrowRight className="w-3 h-3" />
-                            </button>
+                              Stage to Approvals
+                            </Button>
                           </div>
                         </div>
 
                         {isDraftsExpanded && (
-                          <div className="pt-2 border-t border-emerald-200 space-y-1.5">
+                          <div className="pt-2 border-t border-border space-y-1.5">
                             {resp.generated_actions.map((act, aIdx) => (
                               <div
                                 key={aIdx}
-                                className="p-2 rounded bg-white border border-emerald-100 text-xs text-slate-700 space-y-0.5"
+                                className="p-2 rounded-[4px] bg-surface border border-border text-xs text-text space-y-0.5"
                               >
-                                <div className="flex items-center justify-between font-semibold text-emerald-950 text-[11px]">
+                                <div className="flex items-center justify-between font-medium text-text text-[11px]">
                                   <span>{act.student_name} ({act.phone_masked})</span>
-                                  {act.amount && <span className="font-mono">EMI: ₹{act.amount.toLocaleString()}</span>}
+                                  {act.amount && <span className="font-mono tabular-nums">EMI: â‚¹{act.amount.toLocaleString()}</span>}
                                 </div>
-                                <p className="text-[11px] text-slate-600 italic">
+                                <p className="text-[11px] text-text-muted italic">
                                   "{act.message}"
                                 </p>
                               </div>
@@ -516,35 +507,35 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
                       </div>
                     )}
 
-                    {/* Query Transparency */}
-                    <div className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50/60">
+                    {/* How I Got This (Collapsible SQL) */}
+                    <div className="border border-border rounded-[6px] overflow-hidden bg-surface">
                       <button
                         onClick={() => toggleQuery(msg.id)}
-                        className="w-full px-3 py-2 flex items-center justify-between text-xs font-medium text-slate-700 hover:bg-slate-100 cursor-pointer"
+                        className="w-full px-3 py-2 flex items-center justify-between text-xs font-medium text-text-muted hover:text-text hover:bg-surface-subtle cursor-pointer"
                       >
                         <div className="flex items-center gap-1.5">
-                          <TableIcon className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Generated SQL & Execution Log</span>
+                          <TableIcon className="w-3.5 h-3.5 text-text-subtle" strokeWidth={1.5} />
+                          <span>How I got this (Generated SQL & Execution Log)</span>
                         </div>
-                        <div className="flex items-center gap-2 text-slate-500 text-[11px] font-mono">
+                        <div className="flex items-center gap-2 text-text-subtle text-[11px] font-mono tabular-nums">
                           <span>{resp.duration_ms}ms</span>
                           {isQueryExpanded ? (
-                            <ChevronUp className="w-3.5 h-3.5" />
+                            <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.5} />
                           ) : (
-                            <ChevronDown className="w-3.5 h-3.5" />
+                            <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} />
                           )}
                         </div>
                       </button>
 
                       {isQueryExpanded && (
-                        <div className="p-3 border-t border-slate-200 bg-slate-900 text-slate-200 text-xs font-mono space-y-2">
-                          <div className="flex items-center justify-between text-[11px] text-slate-400">
+                        <div className="p-3 border-t border-border bg-surface-subtle text-text text-xs font-mono space-y-2">
+                          <div className="flex items-center justify-between text-[11px] text-text-muted">
                             <div className="flex items-center gap-1.5">
                               <span>Tables:</span>
                               {resp.tables_used.map((tbl, i) => (
                                 <span
                                   key={i}
-                                  className="px-1.5 py-0.2 rounded bg-slate-800 text-indigo-300 font-mono text-[10px]"
+                                  className="px-1.5 py-0.2 rounded-[3px] bg-surface border border-border text-accent font-mono text-[10px]"
                                 >
                                   {tbl}
                                 </span>
@@ -553,29 +544,28 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
 
                             <button
                               onClick={() => copySqlToClipboard(resp.sql, msg.id)}
-                              className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer text-[11px]"
+                              className="flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-surface border border-border hover:bg-surface-subtle text-text transition-colors cursor-pointer text-[11px]"
                             >
                               {copiedSqlId === msg.id ? (
                                 <>
-                                  <Check className="w-3 h-3 text-emerald-400" />
-                                  <span className="text-emerald-400">Copied</span>
+                                  <Check className="w-3 h-3 text-status-green" strokeWidth={1.5} />
+                                  <span className="text-status-green">Copied</span>
                                 </>
                               ) : (
                                 <>
-                                  <Copy className="w-3 h-3" />
-                                  <span>Copy</span>
+                                  <Copy className="w-3 h-3" strokeWidth={1.5} />
+                                  <span>Copy SQL</span>
                                 </>
                               )}
                             </button>
                           </div>
 
-                          <pre className="overflow-x-auto text-xs text-indigo-200 leading-relaxed whitespace-pre-wrap p-2 rounded bg-slate-950/80 border border-slate-800">
+                          <pre className="overflow-x-auto text-xs text-text leading-relaxed whitespace-pre-wrap p-2.5 rounded-[4px] bg-surface border border-border tabular-nums font-mono">
                             {resp.sql}
                           </pre>
                         </div>
                       )}
                     </div>
-
                   </div>
                 )}
               </div>
@@ -586,7 +576,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
       </div>
 
       {/* Input Form */}
-      <div className="p-3 border-t border-slate-200 bg-white shrink-0">
+      <div className="p-3 border-t border-border bg-surface shrink-0">
         <form
           onSubmit={e => {
             e.preventDefault();
@@ -598,25 +588,26 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ onNavigateToApprovals 
             type="text"
             value={inputQuestion}
             onChange={e => setInputQuestion(e.target.value)}
-            placeholder="Ask Copilot (e.g. Which Java students missed 3+ classes and have EMIs due?)"
+            placeholder="Ask Copilot in plain English (e.g. Which Java students missed 3+ classes and have EMIs due?)"
             disabled={isSubmitting}
-            className="flex-1 px-3.5 py-2 text-xs sm:text-sm rounded-lg border border-slate-200 focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 disabled:opacity-60"
+            className="flex-1 px-3 py-2 text-xs rounded-[6px] border border-border bg-surface text-text focus:border-accent disabled:opacity-60"
           />
 
-          <button
+          <Button
             type="submit"
+            variant="primary"
             disabled={!inputQuestion.trim() || isSubmitting}
-            className="flex items-center justify-center p-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 transition-colors cursor-pointer shrink-0"
-            title="Ask Copilot"
+            icon={<Send className="w-3.5 h-3.5" strokeWidth={1.5} />}
           >
-            <Send className="w-4 h-4" />
-          </button>
+            Ask
+          </Button>
         </form>
-        <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400">
-          <span>Read-only queries strictly verified against role permissions.</span>
-          <span>Zero automated messaging without human sign-off.</span>
+        <div className="mt-1.5 flex items-center justify-between text-[10px] text-text-subtle">
+          <span>Single-statement read-only SQL verified against role views.</span>
+          <span>WhatsApp reminders staged for approval before delivery.</span>
         </div>
       </div>
     </div>
   );
 };
+

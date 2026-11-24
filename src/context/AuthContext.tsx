@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { decodeJwt } from '../lib/jwt';
-import { DEMO_USERS } from '../lib/mock/data';
+import { DEMO_ACCOUNTS } from '../lib/demoAccounts';
 import { User, UserRole } from '../types';
 
 interface AuthContextType {
@@ -10,7 +10,7 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, roleHint?: UserRole) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, role: UserRole, specialization?: string) => Promise<void>;
   logout: () => void;
   switchRoleQuick: (targetRole: UserRole) => Promise<void>;
@@ -38,17 +38,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (token) {
       const decoded = decodeJwt(token);
       if (decoded && decoded.role) {
-        // Find existing avatar/details or synthesize from decoded claims
-        const demoMatch = Object.values(DEMO_USERS).find(u => u.id === decoded.id || u.role === decoded.role);
+        const demoMatch = Object.values(DEMO_ACCOUNTS).find(u => u.id === decoded.id || u.role === decoded.role);
         setUser({
           id: decoded.id,
           name: decoded.name,
           email: decoded.email,
-          role: decoded.role, // STRICTLY from JWT
+          role: decoded.role,
           trainer_id: decoded.trainer_id,
           avatar: demoMatch?.avatar,
         });
-        setRole(decoded.role); // Role strictly assigned from JWT claims
+        setRole(decoded.role);
       } else {
         // Invalid or expired token
         localStorage.removeItem('copilot_jwt_token');
@@ -83,10 +82,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (email: string, roleHint?: UserRole) => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const { token: newToken } = await api.login(email, roleHint);
+      const { token: newToken } = await api.login(email, password);
       setToken(newToken);
       setForbiddenScreenTriggered(false);
     } finally {
@@ -114,9 +113,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchRoleQuick = async (targetRole: UserRole) => {
-    const targetDemo = DEMO_USERS[targetRole];
+    const targetDemo = DEMO_ACCOUNTS[targetRole];
     if (targetDemo) {
-      await login(targetDemo.email, targetRole);
+      await login(targetDemo.email, targetDemo.password);
     }
   };
 

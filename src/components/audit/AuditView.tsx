@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileText,
   ShieldCheck,
@@ -86,23 +86,23 @@ export const AuditView: React.FC = () => {
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text">
           Audit & Query Log
         </h1>
-        <p className="text-xs text-slate-500 mt-0.5">
+        <p className="text-xs text-text-muted mt-0.5">
           Immutable governance record. Every natural-language inquiry, generated SQL, and role access check is tracked.
         </p>
       </div>
 
       {/* Tabs & Controls */}
-      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 border border-slate-200/60">
+      <div className="bg-surface p-3 rounded-[6px] border border-border  flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-1 p-0.5 rounded-[6px] bg-surface-muted border border-border/60">
           <button
             onClick={() => setActiveTab('queries')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all cursor-pointer ${
               activeTab === 'queries'
-                ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-surface text-text  font-semibold'
+                : 'text-text-muted hover:text-text'
             }`}
           >
             <Terminal className="w-3.5 h-3.5" />
@@ -111,10 +111,10 @@ export const AuditView: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('audit')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all cursor-pointer ${
               activeTab === 'audit'
-                ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-surface text-text  font-semibold'
+                : 'text-text-muted hover:text-text'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
@@ -124,20 +124,20 @@ export const AuditView: React.FC = () => {
 
         <div className="flex items-center gap-2 w-full md:w-auto">
           <div className="relative flex-1 md:w-56">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2" />
+            <Search className="w-3.5 h-3.5 text-text-subtle absolute left-3 top-2" />
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search statements or users..."
-              className="w-full pl-9 pr-3 py-1 text-xs rounded-lg border border-slate-200 focus:outline-hidden focus:border-indigo-500"
+              className="w-full pl-9 pr-3 py-1 text-xs rounded-[6px] border border-border focus:outline-hidden focus:border-indigo-500"
             />
           </div>
 
           <select
             value={roleFilter}
             onChange={e => setRoleFilter(e.target.value)}
-            className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-white font-medium text-slate-700"
+            className="px-2.5 py-1 text-xs rounded-[6px] border border-border bg-surface font-medium text-text-muted"
           >
             <option value="all">All Roles</option>
             <option value="owner">Owner</option>
@@ -150,20 +150,20 @@ export const AuditView: React.FC = () => {
 
       {/* Tab 1: Copilot Query Log */}
       {activeTab === 'queries' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+        <div className="bg-surface rounded-[6px] border border-border  overflow-hidden">
           {loading ? (
-            <div className="p-12 text-center text-slate-400 text-sm">
+            <div className="p-12 text-center text-text-subtle text-sm">
               <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               Loading query log...
             </div>
           ) : filteredQueries.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 text-sm">
+            <div className="p-12 text-center text-text-muted text-sm">
               No queries match criteria.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-[11px]">
+                <thead className="bg-surface-subtle border-b border-border text-text-muted font-semibold text-[11px]">
                   <tr>
                     <th className="py-2.5 px-3.5">Timestamp</th>
                     <th className="py-2.5 px-3.5">Role</th>
@@ -176,8 +176,8 @@ export const AuditView: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredQueries.map(q => (
-                    <tr key={q.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-2.5 px-3.5 text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                    <tr key={q.id} className="hover:bg-surface-subtle/70 transition-colors">
+                      <td className="py-2.5 px-3.5 text-text-muted font-mono text-[11px] whitespace-nowrap">
                         {formatDateTime(q.timestamp)}
                       </td>
 
@@ -198,14 +198,14 @@ export const AuditView: React.FC = () => {
                         </Badge>
                       </td>
 
-                      <td className="py-2.5 px-3.5 font-medium text-slate-900 max-w-xs truncate">
+                      <td className="py-2.5 px-3.5 font-medium text-text max-w-xs truncate">
                         {q.question}
                       </td>
 
                       <td className="py-2.5 px-3.5">
                         <button
                           onClick={() => setSelectedSql(q.sql)}
-                          className="flex items-center gap-1 font-mono text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded hover:bg-indigo-100 transition-colors cursor-pointer"
+                          className="flex items-center gap-1 font-mono text-[11px] text-accent bg-accent-subtle border border-indigo-100 px-2 py-0.5 rounded hover:bg-indigo-100 transition-colors cursor-pointer"
                         >
                           <Code className="w-3 h-3" />
                           SQL
@@ -242,11 +242,11 @@ export const AuditView: React.FC = () => {
                         )}
                       </td>
 
-                      <td className="py-2.5 px-3.5 font-mono text-slate-700">
+                      <td className="py-2.5 px-3.5 font-mono text-text-muted">
                         {q.row_count}
                       </td>
 
-                      <td className="py-2.5 px-3.5 font-mono text-slate-500">
+                      <td className="py-2.5 px-3.5 font-mono text-text-muted">
                         {q.duration_ms}ms
                       </td>
                     </tr>
@@ -260,20 +260,20 @@ export const AuditView: React.FC = () => {
 
       {/* Tab 2: Platform Audit Trail */}
       {activeTab === 'audit' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+        <div className="bg-surface rounded-[6px] border border-border  overflow-hidden">
           {loading ? (
-            <div className="p-12 text-center text-slate-400 text-sm">
+            <div className="p-12 text-center text-text-subtle text-sm">
               <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               Loading audit records...
             </div>
           ) : filteredAudit.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 text-sm">
+            <div className="p-12 text-center text-text-muted text-sm">
               No audit entries recorded.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-[11px]">
+                <thead className="bg-surface-subtle border-b border-border text-text-muted font-semibold text-[11px]">
                   <tr>
                     <th className="py-2.5 px-3.5">Timestamp</th>
                     <th className="py-2.5 px-3.5">User</th>
@@ -286,29 +286,29 @@ export const AuditView: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredAudit.map(a => (
-                    <tr key={a.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-2.5 px-3.5 text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                    <tr key={a.id} className="hover:bg-surface-subtle/70 transition-colors">
+                      <td className="py-2.5 px-3.5 text-text-muted font-mono text-[11px] whitespace-nowrap">
                         {formatDateTime(a.timestamp)}
                       </td>
 
                       <td className="py-2.5 px-3.5">
-                        <div className="font-semibold text-slate-900">{a.user_name}</div>
-                        <span className="text-[10px] text-slate-400 capitalize">{a.role}</span>
+                        <div className="font-semibold text-text">{a.user_name}</div>
+                        <span className="text-[10px] text-text-subtle capitalize">{a.role}</span>
                       </td>
 
-                      <td className="py-2.5 px-3.5 font-mono text-indigo-700 font-medium text-[11px]">
+                      <td className="py-2.5 px-3.5 font-mono text-accent font-medium text-[11px]">
                         {a.action}
                       </td>
 
-                      <td className="py-2.5 px-3.5 text-slate-700 font-medium">
+                      <td className="py-2.5 px-3.5 text-text-muted font-medium">
                         {a.target}
                       </td>
 
-                      <td className="py-2.5 px-3.5 text-slate-600 max-w-sm">
+                      <td className="py-2.5 px-3.5 text-text-muted max-w-sm">
                         {a.details}
                       </td>
 
-                      <td className="py-2.5 px-3.5 font-mono text-slate-400 text-[11px]">
+                      <td className="py-2.5 px-3.5 font-mono text-text-subtle text-[11px]">
                         {a.ip_address}
                       </td>
 
@@ -347,7 +347,7 @@ export const AuditView: React.FC = () => {
         >
           <div className="space-y-4">
             <div className="relative">
-              <pre className="p-3.5 bg-slate-950 text-indigo-200 rounded-lg text-xs font-mono overflow-x-auto leading-relaxed border border-slate-800">
+              <pre className="p-3.5 bg-slate-950 text-indigo-200 rounded-[6px] text-xs font-mono overflow-x-auto leading-relaxed border border-slate-800">
                 {selectedSql}
               </pre>
 
@@ -363,7 +363,7 @@ export const AuditView: React.FC = () => {
             <div className="flex justify-end pt-1">
               <button
                 onClick={() => setSelectedSql(null)}
-                className="px-3.5 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-medium hover:bg-slate-900 transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 rounded-[6px] bg-slate-800 text-white text-xs font-medium hover:bg-slate-900 transition-colors cursor-pointer"
               >
                 Close
               </button>
@@ -374,3 +374,5 @@ export const AuditView: React.FC = () => {
     </div>
   );
 };
+
+

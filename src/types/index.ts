@@ -314,3 +314,19 @@ export interface FailureChainStudent {
   resolution_status: 'unaddressed' | 'plan_staged' | 'in_progress' | 'stabilized';
 }
 
+
+export interface DashboardStats {
+  activeStudents: number;
+  attendanceRate: number;
+  emisDueAmount: number;
+  emisDueCount: number;
+  trainerUtilization: number;
+  activeBatches: number;
+}
+
+export interface DashboardAnalytics {
+  stats: DashboardStats;
+  attendance_trend: Array<{ day: string; overall: number; classroom: number; online: number }>;
+  batch_attendance: Array<{ batch: string; rate: number; target: number }>;
+  fee_forecast: Array<{ week: string; collected: number; projected: number }>;
+}

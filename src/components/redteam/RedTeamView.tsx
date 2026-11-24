@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   Flame,
   ShieldCheck,
@@ -60,7 +60,7 @@ export const RedTeamView: React.FC = () => {
   return (
     <div className="space-y-5">
       {/* Top Banner */}
-      <div className="bg-[#111318] rounded-xl p-5 text-white border border-white/5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[#111318] rounded-[6px] p-5 text-white border border-white/5  flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-950/80 text-rose-300 border border-rose-800/30 mb-2">
             <Flame className="w-3 h-3 text-rose-500" />
@@ -69,7 +69,7 @@ export const RedTeamView: React.FC = () => {
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
             Red-Team Security Suite
           </h1>
-          <p className="text-xs text-slate-400 mt-1 max-w-xl leading-relaxed">
+          <p className="text-xs text-text-subtle mt-1 max-w-xl leading-relaxed">
             Fires 10 targeted attack vectors executed under the restricted <span className="text-white font-semibold">Trainer</span> persona:
             SQL injection, PII exfiltration, prompt injection, and AST schema bypass.
           </p>
@@ -78,7 +78,7 @@ export const RedTeamView: React.FC = () => {
         <button
           onClick={handleRunSuite}
           disabled={isRunning}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-2xs transition-all shrink-0 disabled:opacity-50 cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-[6px] bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs  transition-all shrink-0 disabled:opacity-50 cursor-pointer"
         >
           {isRunning ? (
             <>
@@ -97,12 +97,12 @@ export const RedTeamView: React.FC = () => {
       {/* Summary Scorecard if suite ran */}
       {suiteSummary && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+          <div className="bg-surface p-4 rounded-[6px] border border-border ">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
                 Defense Success Rate
               </span>
-              <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+              <div className="p-1.5 rounded-[6px] bg-emerald-50 text-emerald-600">
                 <ShieldCheck className="w-4 h-4" />
               </div>
             </div>
@@ -114,55 +114,55 @@ export const RedTeamView: React.FC = () => {
                 100%
               </Badge>
             </div>
-            <div className="mt-0.5 text-xs text-slate-400">Zero data leaks across all vectors</div>
+            <div className="mt-0.5 text-xs text-text-subtle">Zero data leaks across all vectors</div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+          <div className="bg-surface p-4 rounded-[6px] border border-border ">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
                 Data Leaks Detected
               </span>
-              <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
+              <div className="p-1.5 rounded-[6px] bg-rose-50 text-rose-600">
                 <ShieldAlert className="w-4 h-4" />
               </div>
             </div>
-            <div className="mt-2 text-2xl font-bold text-slate-900">
+            <div className="mt-2 text-2xl font-bold text-text">
               {suiteSummary.leaked} Leaks
             </div>
-            <div className="mt-0.5 text-xs text-slate-400">PII, fee ledgers, and contact tokens secured</div>
+            <div className="mt-0.5 text-xs text-text-subtle">PII, fee ledgers, and contact tokens secured</div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+          <div className="bg-surface p-4 rounded-[6px] border border-border ">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
                 Legitimate Control
               </span>
-              <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+              <div className="p-1.5 rounded-[6px] bg-accent-subtle text-accent">
                 <CheckCircle2 className="w-4 h-4" />
               </div>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-indigo-700">1 / 1 Allowed</span>
+              <span className="text-2xl font-bold text-accent">1 / 1 Allowed</span>
               <Badge variant="info" size="sm">
                 Pass
               </Badge>
             </div>
-            <div className="mt-0.5 text-xs text-slate-400">Routine attendance queries work normally</div>
+            <div className="mt-0.5 text-xs text-text-subtle">Routine attendance queries work normally</div>
           </div>
         </div>
       )}
 
       {/* Attack Suite Results Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="p-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+      <div className="bg-surface rounded-[6px] border border-border  overflow-hidden">
+        <div className="p-3.5 border-b border-border bg-surface-subtle flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-slate-900 text-xs">Adversarial Evaluation Matrix</h3>
-            <p className="text-[11px] text-slate-400">
-              Simulated caller context: <code className="text-indigo-600 font-mono">Role: 'trainer'</code>
+            <h3 className="font-semibold text-text text-xs">Adversarial Evaluation Matrix</h3>
+            <p className="text-[11px] text-text-subtle">
+              Simulated caller context: <code className="text-accent font-mono">Role: 'trainer'</code>
             </p>
           </div>
           {testResults.length > 0 && (
-            <span className="text-[11px] font-mono text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded">
+            <span className="text-[11px] font-mono text-text-muted bg-surface border border-border px-2 py-0.5 rounded">
               {testResults.length} Test Vectors
             </span>
           )}
@@ -171,27 +171,27 @@ export const RedTeamView: React.FC = () => {
         {isRunning ? (
           <div className="p-12 text-center space-y-2">
             <div className="w-6 h-6 border-2 border-rose-600 border-t-transparent rounded-full animate-spin mx-auto" />
-            <div className="text-xs font-semibold text-slate-800">
+            <div className="text-xs font-semibold text-text">
               Evaluating 10 attack vectors against AST validator...
             </div>
-            <div className="text-[11px] text-slate-400 font-mono">
+            <div className="text-[11px] text-text-subtle font-mono">
               Testing injection boundaries and role-level schema views
             </div>
           </div>
         ) : testResults.length === 0 ? (
           <div className="p-12 text-center space-y-2">
             <Flame className="w-8 h-8 text-slate-300 mx-auto" />
-            <div className="text-xs font-medium text-slate-600">
+            <div className="text-xs font-medium text-text-muted">
               Attack suite has not been run for this session.
             </div>
-            <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+            <p className="text-[11px] text-text-subtle max-w-sm mx-auto">
               Click "Run Attack Suite" to test the defensive barrier against adversarial trainer requests.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-[11px]">
+              <thead className="bg-surface-subtle border-b border-border text-text-muted font-semibold text-[11px]">
                 <tr>
                   <th className="py-2.5 px-3.5 w-10 text-center">#</th>
                   <th className="py-2.5 px-3.5">Adversarial Prompt & Intent</th>
@@ -209,21 +209,21 @@ export const RedTeamView: React.FC = () => {
                   return (
                     <tr
                       key={item.id}
-                      className={`hover:bg-slate-50/70 transition-colors ${
-                        isControl ? 'bg-indigo-50/20' : ''
+                      className={`hover:bg-surface-subtle/70 transition-colors ${
+                        isControl ? 'bg-accent-subtle/20' : ''
                       }`}
                     >
-                      <td className="py-2.5 px-3.5 text-center font-mono text-slate-400 text-[11px]">
+                      <td className="py-2.5 px-3.5 text-center font-mono text-text-subtle text-[11px]">
                         {idx + 1}
                       </td>
 
                       <td className="py-2.5 px-3.5 max-w-md">
-                        <div className="font-medium text-slate-900 leading-snug">
+                        <div className="font-medium text-text leading-snug">
                           "{item.prompt}"
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1 font-mono">
+                        <div className="text-[11px] text-text-subtle mt-0.5 flex items-center gap-1 font-mono">
                           <span>Vector:</span>
-                          <span className="text-slate-600">{item.intent}</span>
+                          <span className="text-text-muted">{item.intent}</span>
                         </div>
                       </td>
 
@@ -244,19 +244,19 @@ export const RedTeamView: React.FC = () => {
                       </td>
 
                       <td className="py-2.5 px-3.5 whitespace-nowrap">
-                        <span className="font-mono text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                        <span className="font-mono text-[10px] font-semibold text-accent bg-accent-subtle px-1.5 py-0.5 rounded border border-indigo-100">
                           {item.layer}
                         </span>
                       </td>
 
-                      <td className="py-2.5 px-3.5 text-slate-600 max-w-xs leading-relaxed text-[11px]">
+                      <td className="py-2.5 px-3.5 text-text-muted max-w-xs leading-relaxed text-[11px]">
                         {item.reason}
                       </td>
 
                       <td className="py-2.5 px-3.5 text-right">
                         <button
                           onClick={() => setSelectedResult(item)}
-                          className="px-2 py-1 rounded border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 text-[11px] font-medium transition-colors cursor-pointer"
+                          className="px-2 py-1 rounded border border-border text-text-muted hover:text-accent hover:bg-surface-subtle text-[11px] font-medium transition-colors cursor-pointer"
                         >
                           Trace
                         </button>
@@ -279,16 +279,16 @@ export const RedTeamView: React.FC = () => {
           description={`Simulated execution under role: ${selectedResult.simulated_role.toUpperCase()}`}
           maxWidth="lg"
         >
-          <div className="space-y-3.5 text-xs text-slate-700">
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
-              <div className="font-semibold text-slate-900 text-[11px]">User Prompt:</div>
-              <p className="text-slate-800 font-mono bg-white p-2 rounded border border-slate-200 text-xs">
+          <div className="space-y-3.5 text-xs text-text-muted">
+            <div className="p-3 bg-surface-subtle rounded-[6px] border border-border space-y-1">
+              <div className="font-semibold text-text text-[11px]">User Prompt:</div>
+              <p className="text-text font-mono bg-surface p-2 rounded border border-border text-xs">
                 "{selectedResult.prompt}"
               </p>
             </div>
 
-            <div className="p-3 bg-slate-950 text-indigo-200 rounded-lg font-mono space-y-1 border border-slate-800">
-              <div className="text-[10px] uppercase font-bold text-slate-400">
+            <div className="p-3 bg-slate-950 text-indigo-200 rounded-[6px] font-mono space-y-1 border border-slate-800">
+              <div className="text-[10px] uppercase font-bold text-text-subtle">
                 SQL Attempt / Interception:
               </div>
               <pre className="text-xs overflow-x-auto whitespace-pre-wrap">
@@ -297,8 +297,8 @@ export const RedTeamView: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <div className="font-semibold text-slate-900 text-[11px]">Enforcement Summary:</div>
-              <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
+              <div className="font-semibold text-text text-[11px]">Enforcement Summary:</div>
+              <div className="p-2.5 rounded-[6px] bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
                 {selectedResult.response_summary}
               </div>
             </div>
@@ -306,7 +306,7 @@ export const RedTeamView: React.FC = () => {
             <div className="flex justify-end pt-1">
               <button
                 onClick={() => setSelectedResult(null)}
-                className="px-3.5 py-1.5 rounded-lg bg-slate-800 text-white font-medium hover:bg-slate-900 text-xs cursor-pointer"
+                className="px-3.5 py-1.5 rounded-[6px] bg-slate-800 text-white font-medium hover:bg-slate-900 text-xs cursor-pointer"
               >
                 Close
               </button>
@@ -317,3 +317,5 @@ export const RedTeamView: React.FC = () => {
     </div>
   );
 };
+
+

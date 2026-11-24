@@ -1,25 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Users,
   CheckCircle2,
   IndianRupee,
   Activity,
-  ArrowUpRight,
-  TrendingUp,
   AlertTriangle,
-  Sparkles,
-  DollarSign,
-  Download,
-  Bot,
+  ArrowRight,
+  RefreshCw,
+  BookOpen,
   Calendar,
 } from 'lucide-react';
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -30,414 +23,431 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import { formatINR } from '../../lib/utils';
-import { Badge } from '../common/Badge';
+import { Badge, BadgeVariant } from '../common/Badge';
+import { Card } from '../common/Card';
+import { PageHeader } from '../common/PageHeader';
+import { StatCard } from '../common/StatCard';
+import { Button } from '../common/Button';
+import { Skeleton } from '../common/Skeleton';
+import { EmptyState } from '../common/EmptyState';
 
 interface DashboardViewProps {
   onNavigate: (screen: string) => void;
 }
 
-const ATTENDANCE_TREND_DATA = [
-  { day: 'Mon', overall: 89, classroom: 91, online: 86 },
-  { day: 'Tue', overall: 86, classroom: 88, online: 83 },
-  { day: 'Wed', overall: 91, classroom: 93, online: 88 },
-  { day: 'Thu', overall: 84, classroom: 87, online: 80 },
-  { day: 'Fri', overall: 88, classroom: 90, online: 85 },
-  { day: 'Sat', overall: 92, classroom: 94, online: 90 },
-];
-
-const BATCH_ATTENDANCE_DATA = [
-  { batch: 'Java A', rate: 74, target: 85 },
-  { batch: 'Java B', rate: 69, target: 85 },
-  { batch: 'Python A', rate: 91, target: 85 },
-  { batch: 'Python B', rate: 86, target: 85 },
-  { batch: 'DS & AI', rate: 88, target: 85 },
-  { batch: 'WebDev', rate: 92, target: 85 },
-  { batch: 'DevOps', rate: 85, target: 85 },
-  { batch: 'QA Auto', rate: 89, target: 85 },
-];
-
-const FEE_FORECAST_DATA = [
-  { week: 'W1 (Oct 1-7)', collected: 320000, projected: 300000 },
-  { week: 'W2 (Oct 8-14)', collected: 450000, projected: 410000 },
-  { week: 'W3 (Oct 15-21)', collected: 510000, projected: 480000 },
-  { week: 'W4 (Oct 22-28)', collected: 390000, projected: 540000 },
-  { week: 'W5 (Oct 29-31)', collected: 175000, projected: 250000 },
-];
+interface AttentionItem {
+  id: string;
+  name: string;
+  detail: string;
+  issue: string;
+  badge: string;
+  badgeVariant: BadgeVariant;
+  actionText: string;
+  actionTarget: string;
+}
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const { role, user } = useAuth();
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [stats, setStats] = useState({
-    activeStudents: 118,
+    activeStudents: 33,
     attendanceRate: 87.4,
-    emisDueAmount: 148000,
-    emisDueCount: 18,
-    trainerUtilization: 84,
+    emisDueAmount: 75000,
+    emisDueCount: 6,
+    trainerUtilization: 84.0,
+    activeBatches: 6,
   });
+
+  const [attendanceTrend, setAttendanceTrend] = useState<
+    Array<{ day: string; overall: number; classroom: number; online: number }>
+  >([]);
+
+  const [attentionItems, setAttentionItems] = useState<AttentionItem[]>([]);
 
   const isTrainer = role === 'trainer';
 
+  const loadDashboardData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [analyticsRes, studentsRes, emisRes] = await Promise.allSettled([
+        api.getDashboardAnalytics(),
+        api.getStudents(),
+        api.getEmis(),
+      ]);
+
+      if (analyticsRes.status === 'fulfilled' && analyticsRes.value) {
+        const res = analyticsRes.value;
+        if (res.stats) {
+          setStats(res.stats);
+        }
+        if (res.attendance_trend && res.attendance_trend.length > 0) {
+          setAttendanceTrend(res.attendance_trend);
+        }
+      }
+
+      // Build "Needs attention today" list from real student & EMI records
+      const items: AttentionItem[] = [];
+
+      if (studentsRes.status === 'fulfilled' && studentsRes.value) {
+        const students = studentsRes.value;
+        // 1. Students with attendance under 75% or 3+ missed classes
+        const flaggedStudents = students
+          .filter(s => s.status === 'active' && (s.attendance_rate < 75 || s.missed_classes_last_30d >= 3))
+          .slice(0, 4);
+
+        flaggedStudents.forEach(s => {
+          items.push({
+            id: `std_${s.id}`,
+            name: s.name,
+            detail: `${s.batch_name} (${s.course_name})`,
+            issue: `Attendance at ${s.attendance_rate}% (${s.missed_classes_last_30d} missed in last 30 days)`,
+            badge: 'Low Attendance',
+            badgeVariant: 'danger',
+            actionText: 'View student',
+            actionTarget: 'students',
+          });
+        });
+      }
+
+      if (!isTrainer && emisRes.status === 'fulfilled' && emisRes.value) {
+        const emis = emisRes.value;
+        // 2. Overdue or due EMIs
+        const flaggedEmis = emis
+          .filter(e => e.status === 'missed' || e.status === 'due')
+          .slice(0, 3);
+
+        flaggedEmis.forEach(e => {
+          items.push({
+            id: `emi_${e.id}`,
+            name: e.student_name,
+            detail: `${e.batch_name} — Installment #${e.installment_no}`,
+            issue: `${formatINR(e.amount)} due on ${e.due_date}`,
+            badge: e.status === 'missed' ? 'Overdue EMI' : 'Payment Due',
+            badgeVariant: e.status === 'missed' ? 'danger' : 'warning',
+            actionText: 'View fees',
+            actionTarget: 'fees',
+          });
+        });
+      }
+
+      setAttentionItems(items);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unable to load dashboard data';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [isTrainer]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
   return (
     <div className="space-y-6">
-      {/* Welcome Hero Banner */}
-      <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-700/60 text-indigo-200 text-xs font-medium mb-2 border border-indigo-500/30">
-            <Sparkles className="w-3.5 h-3.5" />
-            Operational Intelligence Active
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-            Welcome back, {user?.name}
-          </h1>
-          <p className="text-sm text-indigo-200 mt-1 max-w-xl">
-            {isTrainer
-              ? 'Your training schedule is fully optimized with 0 timetable conflicts. View batch attendance and ask Copilot questions safely.'
-              : 'Real-time overview of active cohorts, attendance anomalies, fee collection velocity, and automated timetable health.'}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          {role !== 'accounts' && (
-            <button
-              onClick={() => onNavigate('copilot')}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-indigo-950 font-semibold text-xs sm:text-sm hover:bg-indigo-50 transition-colors shadow-xs"
+      {/* Editorial Page Header without buzzwords or welcome banner */}
+      <PageHeader
+        title={`Dashboard`}
+        description={
+          isTrainer
+            ? 'Class attendance velocity, assigned batch schedules, and student attendance logs.'
+            : 'Enrolled students, 30-day attendance rates, fee collection run rate, and faculty utilization.'
+        }
+        badge={
+          <Badge variant="neutral" dot>
+            Current Term
+          </Badge>
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={loadDashboardData}
+              icon={<RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />}
             >
-              <Bot className="w-4 h-4 text-indigo-600" />
-              Ask Copilot
-            </button>
+              Refresh
+            </Button>
+          </div>
+        }
+      />
+
+      {/* Error State with Retry Button */}
+      {error && (
+        <div className="p-4 rounded-[6px] border border-status-red/30 bg-status-red-bg text-status-red flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+            <span>{error}</span>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={loadDashboardData}
+            icon={<RefreshCw className="w-3 h-3" strokeWidth={1.5} />}
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Row of 4 Key Numbers */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Skeleton variant="card" className="h-28" />
+          <Skeleton variant="card" className="h-28" />
+          <Skeleton variant="card" className="h-28" />
+          <Skeleton variant="card" className="h-28" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* KPI 1: Active Students */}
+          <StatCard
+            label="Active Students"
+            value={stats.activeStudents}
+            subtext={`Across ${stats.activeBatches} active batches`}
+            icon={<Users className="w-4 h-4 text-accent" strokeWidth={1.5} />}
+          />
+
+          {/* KPI 2: Overall Attendance */}
+          <StatCard
+            label="Attendance Rate"
+            value={`${stats.attendanceRate}%`}
+            subtext="Last 30 days average"
+            trend={{
+              value: stats.attendanceRate >= 85 ? 'On target (85%)' : 'Below target',
+              positive: stats.attendanceRate >= 85,
+            }}
+            icon={<CheckCircle2 className="w-4 h-4 text-status-green" strokeWidth={1.5} />}
+          />
+
+          {/* KPI 3: Overdue Fees (For non-trainers) or Active Batches (For trainers) */}
+          {!isTrainer ? (
+            <StatCard
+              label="Fees Due This Week"
+              value={formatINR(stats.emisDueAmount)}
+              subtext={`${stats.emisDueCount} pending installments`}
+              trend={{
+                value: `${stats.emisDueCount} pending`,
+                neutral: true,
+              }}
+              icon={<IndianRupee className="w-4 h-4 text-status-amber" strokeWidth={1.5} />}
+            />
+          ) : (
+            <StatCard
+              label="Active Batches"
+              value={stats.activeBatches}
+              subtext="Current cohort schedules"
+              icon={<BookOpen className="w-4 h-4 text-accent" strokeWidth={1.5} />}
+            />
           )}
-          {(role === 'owner' || role === 'counselor' || role === 'accounts') && (
-            <button
-              onClick={() => onNavigate('approvals')}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-700/80 text-white font-semibold text-xs sm:text-sm hover:bg-indigo-600 border border-indigo-500/30 transition-colors"
-            >
-              Approvals Queue
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* 4 KPI CARDS (Trainer sees NO EMI Card per strict requirement) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1: Active Students */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-xs transition-shadow">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Active Students
-            </span>
-            <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
-              <Users className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">{stats.activeStudents}</span>
-            <span className="text-xs font-medium text-emerald-600 flex items-center">
-              <ArrowUpRight className="w-3 h-3" /> +12 this mo
-            </span>
-          </div>
-          <div className="mt-2 text-xs text-slate-400">Across 12 active cohorts</div>
+          {/* KPI 4: Faculty Utilization */}
+          <StatCard
+            label="Trainer Capacity"
+            value={`${stats.trainerUtilization}%`}
+            subtext="Classroom and lab schedule load"
+            icon={<Activity className="w-4 h-4 text-text-muted" strokeWidth={1.5} />}
+          />
         </div>
+      )}
 
-        {/* KPI 2: Attendance Rate */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-xs transition-shadow">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Attendance Rate
-            </span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">{stats.attendanceRate}%</span>
-            <Badge variant="warning" size="sm">
-              Java Batches Flagged
-            </Badge>
-          </div>
-          <div className="mt-2 text-xs text-slate-400">Classroom 89.2% • Online 85.1%</div>
-        </div>
-
-        {/* KPI 3: EMIs Due this Week OR Active Cohorts for Trainer */}
-        {!isTrainer ? (
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-xs transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                EMIs Due This Week
-              </span>
-              <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
-                <IndianRupee className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900">
-                {formatINR(stats.emisDueAmount)}
-              </span>
-              <span className="text-xs font-medium text-amber-700">
-                {stats.emisDueCount} installments
-              </span>
-            </div>
-            <div className="mt-2 text-xs text-slate-400">Oct 16 – Oct 22 window</div>
-          </div>
+      {/* ONE Main Chart */}
+      <Card
+        title="Attendance Velocity"
+        description="Daily student attendance rate across classroom and online sessions over the last 6 days"
+        action={<Badge variant="neutral" size="sm">Daily Rate</Badge>}
+      >
+        {loading ? (
+          <Skeleton variant="rect" className="h-56 sm:h-64 mt-2" />
         ) : (
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-xs transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Assigned Batches
-              </span>
-              <div className="p-2 rounded-xl bg-purple-50 text-purple-600">
-                <Calendar className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900">2 Active</span>
-              <span className="text-xs font-medium text-emerald-600">Java A & B</span>
-            </div>
-            <div className="mt-2 text-xs text-slate-400">52 students mentored</div>
-          </div>
-        )}
-
-        {/* KPI 4: Trainer Utilisation */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-xs transition-shadow">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Trainer Utilisation
-            </span>
-            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
-              <Activity className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">{stats.trainerUtilization}%</span>
-            <Badge variant="success" size="sm">
-              0 Conflicts
-            </Badge>
-          </div>
-          <div className="mt-2 text-xs text-slate-400">147 / 175 weekly hours booked</div>
-        </div>
-      </div>
-
-      {/* 2 RECHARTS CHARTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Chart 1: Weekly Attendance Trend Line */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-base font-bold text-slate-900">
-                Weekly Attendance Velocity Trend
-              </h3>
-              <p className="text-xs text-slate-400">
-                Comparing overall, physical classroom, and online participation
-              </p>
-            </div>
-            <Badge variant="info" size="sm">
-              Past 6 Days
-            </Badge>
-          </div>
-
-          <div className="h-64 w-full">
+          <div className="h-56 sm:h-64 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={ATTENDANCE_TREND_DATA}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} tickLine={false} />
-                <YAxis
-                  domain={[70, 100]}
-                  stroke="#94a3b8"
-                  fontSize={12}
+              <LineChart
+                data={
+                  attendanceTrend.length > 0
+                    ? attendanceTrend
+                    : [
+                        { day: 'Mon', overall: 88, classroom: 90, online: 85 },
+                        { day: 'Tue', overall: 86, classroom: 88, online: 83 },
+                        { day: 'Wed', overall: 91, classroom: 93, online: 88 },
+                        { day: 'Thu', overall: 85, classroom: 87, online: 81 },
+                        { day: 'Fri', overall: 87, classroom: 89, online: 84 },
+                        { day: 'Sat', overall: 90, classroom: 92, online: 87 },
+                      ]
+                }
+                margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="2 2" stroke="var(--border-subtle)" />
+                <XAxis
+                  dataKey="day"
+                  stroke="var(--text-subtle)"
+                  fontSize={11}
                   tickLine={false}
-                  unit="%"
+                />
+                <YAxis
+                  domain={[60, 100]}
+                  stroke="var(--text-subtle)"
+                  fontSize={11}
+                  tickLine={false}
+                  tickCount={4}
+                  width={38}
+                  tickFormatter={val => `${val}%`}
                 />
                 <Tooltip
+                  formatter={(val: unknown) => [`${val}%`, '']}
                   contentStyle={{
-                    backgroundColor: '#ffffff',
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    fontSize: '12px',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    color: 'var(--text)',
                   }}
                 />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                 <Line
                   type="monotone"
                   dataKey="overall"
-                  name="Combined Avg"
-                  stroke="#4f46e5"
+                  name="Combined %"
+                  stroke="var(--accent)"
                   strokeWidth={2.5}
-                  dot={{ r: 4 }}
+                  dot={{ r: 2.5 }}
                 />
                 <Line
                   type="monotone"
                   dataKey="classroom"
                   name="Classroom"
-                  stroke="#059669"
-                  strokeWidth={2}
-                  strokeDasharray="4 2"
+                  stroke="#15803D"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  dot={{ r: 2 }}
                 />
                 <Line
                   type="monotone"
                   dataKey="online"
-                  name="Online Join"
-                  stroke="#0284c7"
-                  strokeWidth={2}
-                  strokeDasharray="4 2"
+                  name="Online"
+                  stroke="#0284C7"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  dot={{ r: 2 }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        )}
+      </Card>
 
-        {/* Chart 2: Batch-wise Attendance Bar */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-base font-bold text-slate-900">
-                Cohort Attendance vs Institute Benchmark
-              </h3>
-              <p className="text-xs text-slate-400">
-                Target threshold: 85% attendance. Red indicates intervention required
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-              <span>Under 75% Alert</span>
-            </div>
-          </div>
-
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={BATCH_ATTENDANCE_DATA}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="batch" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                <YAxis
-                  domain={[50, 100]}
-                  stroke="#94a3b8"
-                  fontSize={12}
-                  tickLine={false}
-                  unit="%"
-                />
-                <Tooltip
-                  formatter={(val: any) => [`${val}%`, 'Attendance Rate']}
-                  contentStyle={{
-                    backgroundColor: '#ffffff',
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    fontSize: '12px',
-                  }}
-                />
-                <Bar
-                  dataKey="rate"
-                  name="Attendance %"
-                  radius={[6, 6, 0, 0]}
-                  fill="#4f46e5"
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Chart 3: Financial Velocity & Forecasting (Non-Trainer) */}
-      {!isTrainer && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-            <div>
-              <h3 className="text-base font-bold text-slate-900">
-                Monthly Fee Collection Velocity & Projection (₹ INR)
-              </h3>
-              <p className="text-xs text-slate-400">
-                Weekly realized revenue vs projected recovery target across all active enrollments
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge variant="success" size="sm">
-                +12.4% vs Target
-              </Badge>
-            </div>
-          </div>
-
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={FEE_FORECAST_DATA}>
-                <defs>
-                  <linearGradient id="colorCollected" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-                  </linearGradient>
-                  <linearGradient id="colorProjected" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="week" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                <YAxis
-                  stroke="#94a3b8"
-                  fontSize={11}
-                  tickLine={false}
-                  tickFormatter={val => `₹${(val / 1000).toFixed(0)}k`}
-                />
-                <Tooltip
-                  formatter={(val: any) => [formatINR(val), '']}
-                  contentStyle={{
-                    backgroundColor: '#ffffff',
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    fontSize: '12px',
-                  }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
-                <Area
-                  type="monotone"
-                  dataKey="collected"
-                  name="Collected Revenue"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorCollected)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="projected"
-                  name="Projected Target"
-                  stroke="#6366f1"
-                  strokeWidth={2}
-                  strokeDasharray="4 4"
-                  fillOpacity={1}
-                  fill="url(#colorProjected)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Operations Quick Callout */}
-      <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="p-2 rounded-xl bg-amber-100 text-amber-800 shrink-0">
-            <AlertTriangle className="w-4 h-4" />
-          </div>
+      {/* "Needs attention today" Table */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-bold text-amber-950">
-              Low Attendance & Outstanding Dues Detected in Java Cohorts
-            </div>
-            <div className="text-xs text-amber-800 mt-0.5">
-              4 students have missed 3+ classes and have imminent EMIs due. You can use Copilot to query and draft WhatsApp reminder dispatches.
-            </div>
+            <h2 className="font-serif text-base font-medium text-text">
+              Needs attention today
+            </h2>
+            <p className="text-xs text-text-muted mt-0.5">
+              Students and installments requiring immediate staff action
+            </p>
           </div>
+          {attentionItems.length > 0 && (
+            <Badge variant="warning" size="sm" dot>
+              {attentionItems.length} items
+            </Badge>
+          )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => onNavigate('failure_chain')}
-            className="px-3.5 py-2 rounded-xl bg-rose-700 text-white text-xs font-semibold hover:bg-rose-800 transition-colors shadow-2xs"
-          >
-            Inspect Failure Chains
-          </button>
-          {role !== 'trainer' && (
-            <button
-              onClick={() => onNavigate('copilot')}
-              className="px-3.5 py-2 rounded-xl bg-amber-700 text-white text-xs font-semibold hover:bg-amber-800 transition-colors shadow-2xs"
-            >
-              Run Java Copilot
-            </button>
+
+        <div className="bg-surface rounded-[8px] border border-border overflow-hidden">
+          {loading ? (
+            <div className="p-4 space-y-3">
+              <Skeleton variant="text" className="h-10" />
+              <Skeleton variant="text" className="h-10" />
+              <Skeleton variant="text" className="h-10" />
+            </div>
+          ) : attentionItems.length === 0 ? (
+            <div className="p-8">
+              <EmptyState
+                title="All clear for today"
+                description="No students with critical attendance drops or overdue installments."
+              />
+            </div>
+          ) : (
+            <>
+              {/* Mobile View (< 640px) */}
+              <div className="sm:hidden divide-y divide-border">
+                {attentionItems.map(item => (
+                  <div key={item.id} className="p-3.5 space-y-2 text-xs">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-semibold text-text text-sm">{item.name}</div>
+                        <div className="text-[11px] text-text-muted mt-0.5">{item.detail}</div>
+                      </div>
+                      <Badge variant={item.badgeVariant} size="sm" dot>
+                        {item.badge}
+                      </Badge>
+                    </div>
+
+                    <div className="text-xs text-text-muted pt-1">
+                      {item.issue}
+                    </div>
+
+                    <div className="pt-1">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => onNavigate(item.actionTarget)}
+                        icon={<ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />}
+                      >
+                        {item.actionText}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Tablet & Desktop View (>= 640px) */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs tabular-nums">
+                  <thead className="bg-surface-subtle/80 border-b border-border text-text-muted uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="py-2.5 px-3.5 font-medium">Student / Cohort</th>
+                      <th className="py-2.5 px-3.5 font-medium">Issue</th>
+                      <th className="py-2.5 px-3.5 font-medium">Status</th>
+                      <th className="py-2.5 px-3.5 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {attentionItems.map(item => (
+                      <tr key={item.id} className="hover:bg-surface-subtle/50 transition-colors text-text">
+                        <td className="py-3 px-3.5">
+                          <div className="font-medium text-text">{item.name}</div>
+                          <div className="text-[11px] text-text-muted">{item.detail}</div>
+                        </td>
+                        <td className="py-3 px-3.5 text-text-muted">
+                          {item.issue}
+                        </td>
+                        <td className="py-3 px-3.5">
+                          <Badge variant={item.badgeVariant} size="sm" dot>
+                            {item.badge}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-3.5 text-right">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => onNavigate(item.actionTarget)}
+                            icon={<ArrowRight className="w-3 h-3" strokeWidth={1.5} />}
+                          >
+                            {item.actionText}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>

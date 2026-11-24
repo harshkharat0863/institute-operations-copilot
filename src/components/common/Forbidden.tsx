@@ -1,7 +1,8 @@
 import React from 'react';
-import { ShieldAlert, ArrowLeft, Bot, Home } from 'lucide-react';
+import { ShieldAlert, Home } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Badge } from './Badge';
+import { Button } from './Button';
 
 interface ForbiddenProps {
   attemptedScreen?: string;
@@ -12,50 +13,48 @@ export const Forbidden: React.FC<ForbiddenProps> = ({ attemptedScreen = 'Request
   const { role, user } = useAuth();
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 mb-5 shadow-xs">
-        <ShieldAlert className="w-8 h-8" />
-      </div>
-      
-      <div className="inline-flex items-center gap-2 mb-3">
-        <Badge variant="danger" dot>HTTP 403 Forbidden</Badge>
-        <span className="text-xs text-slate-400">•</span>
-        <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Role-Based Access Control</span>
+    <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+      <div className="w-12 h-12 rounded-[6px] bg-status-red-bg border border-status-red/20 flex items-center justify-center text-status-red mb-4">
+        <ShieldAlert className="w-6 h-6" strokeWidth={1.5} />
       </div>
 
-      <h1 className="text-2xl font-bold text-slate-900 tracking-tight mb-2">
-        Not Allowed for Your Role
+      <div className="inline-flex items-center gap-2 mb-3">
+        <Badge variant="danger" dot>403 Forbidden</Badge>
+        <span className="text-xs text-text-subtle">•</span>
+        <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Access Control</span>
+      </div>
+
+      <h1 className="font-serif text-2xl font-medium text-text tracking-tight mb-2">
+        Restricted for Your Role
       </h1>
-      
-      <p className="text-slate-600 max-w-md text-sm mb-6 leading-relaxed">
-        Your active security profile <strong className="text-slate-800 capitalize">({role || 'Unknown'})</strong> is not permitted to access{' '}
-        <span className="font-semibold text-slate-800">"{attemptedScreen}"</span>. This restriction is enforced client-side and at the API schema view layer.
+
+      <p className="text-text-muted max-w-md text-xs sm:text-sm mb-6 leading-relaxed">
+        Your active persona <strong className="text-text capitalize">({role || 'Unknown'})</strong> is not permitted to access{' '}
+        <span className="font-medium text-text">"{attemptedScreen}"</span>. This restriction is enforced at the database view and API layer.
       </p>
 
-      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-left text-xs text-slate-600 mb-8 max-w-md w-full space-y-1.5">
+      <div className="p-3.5 bg-surface rounded-[8px] border border-border text-left text-xs text-text-muted mb-6 max-w-sm w-full space-y-1.5">
         <div className="flex justify-between">
-          <span className="text-slate-400">Authenticated User:</span>
-          <span className="font-medium text-slate-800">{user?.name}</span>
+          <span className="text-text-subtle">Authenticated User:</span>
+          <span className="font-medium text-text">{user?.name}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-slate-400">Security Clearance:</span>
-          <span className="font-mono text-indigo-700 font-semibold uppercase">{role}</span>
+          <span className="text-text-subtle">Persona:</span>
+          <span className="font-mono text-accent font-medium uppercase">{role}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-slate-400">Policy:</span>
-          <span className="font-mono text-slate-600">Principle of Least Privilege (PoLP)</span>
+          <span className="text-text-subtle">Policy:</span>
+          <span className="font-mono text-text-muted">Least Privilege Enforcement</span>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <button
-          onClick={onNavigateHome}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-medium text-sm hover:bg-indigo-700 shadow-xs transition-colors"
-        >
-          <Home className="w-4 h-4" />
-          Return to Dashboard
-        </button>
-      </div>
+      <Button
+        variant="primary"
+        onClick={onNavigateHome}
+        icon={<Home className="w-4 h-4" strokeWidth={1.5} />}
+      >
+        Return to Dashboard
+      </Button>
     </div>
   );
 };

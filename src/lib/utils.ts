@@ -18,11 +18,8 @@ export function maskPhone(phone?: string): string {
  * Format currency in Indian Rupees (₹)
  */
 export function formatINR(amount: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
+  if (isNaN(amount) || amount === null || amount === undefined) return 'Rs 0';
+  return 'Rs ' + Math.round(amount).toLocaleString('en-IN');
 }
 
 /**
@@ -36,7 +33,6 @@ export function formatDate(dateString?: string): string {
     return d.toLocaleDateString('en-IN', {
       day: 'numeric',
       month: 'short',
-      year: 'numeric',
     });
   } catch {
     return dateString;

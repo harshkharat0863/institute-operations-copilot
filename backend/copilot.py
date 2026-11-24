@@ -1,411 +1,449 @@
 """
-Natural language SQL synthesis and RBAC security guardrails.
-Enforces multi-layer policies (Role View, AST Validator, Input Guardrail).
-Converts natural language into structured operations with read-only database queries.
+Natural language text-to-SQL synthesis using Gemini (google-genai) and sqlglot.
+Strict multi-tier security: Role-based Schema Scoping, sqlglot AST Validation, and read-only execution.
 """
-from typing import Dict, Any
+import os
+import re
+import time
+import logging
+from typing import Dict, Any, List, Set, Optional
+import sqlglot
+from sqlglot import exp
+from dotenv import load_dotenv
 
-def process_copilot_ask(question: str, role: str) -> Dict[str, Any]:
+from backend.db import get_supabase
+
+load_dotenv()
+logger = logging.getLogger("institute_ops.copilot")
+
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+# -------------------------------------------------------------
+# 1. ROLE-BASED SCHEMA WHITELISTS (Item 1 & 2)
+# -------------------------------------------------------------
+ROLE_ALLOWED_TABLES: Dict[str, Set[str]] = {
+    "owner": {
+        "student_fee_summary", "student_attendance_30d", "batch_summary", "emi_due_this_week", "trainer_utilization",
+        "trainer_safe_students", "students", "batches", "courses", "trainers", "rooms", "emis", "payments",
+        "attendance_records", "action_items", "timetable_sessions", "payment_reconciliations", "certificates", "class_recordings"
+    },
+    "counselor": {
+        "student_attendance_30d", "batch_summary", "students", "batches", "courses", "trainers",
+        "rooms", "attendance_records", "action_items", "timetable_sessions", "certificates"
+    },
+    "trainer": {
+        "trainer_safe_students", "batch_summary", "courses", "trainers", "rooms", "timetable_sessions", "class_recordings", "batches"
+    },
+    "accounts": {
+        "student_fee_summary", "emi_due_this_week", "emis", "payments", "payment_reconciliations",
+        "courses", "batch_summary", "action_items"
+    }
+}
+
+ROLE_BLOCKED_COLUMNS: Dict[str, Set[str]] = {
+    "trainer": {
+        "fee", "fee_paid", "fee_pending", "total_fee", "amount", "salary", "payout",
+        "phone", "phone_raw", "bank_account", "password_hash"
+    },
+    "counselor": {
+        "salary", "payout", "hourly_rate", "password_hash"
+    },
+    "accounts": {
+        "password_hash"
+    },
+    "owner": {
+        "password_hash"
+    }
+}
+
+ROLE_SCHEMAS: Dict[str, str] = {
+    "owner": """
+Available Tables & Analytical Views:
+- student_fee_summary (student_id, student_name, email, phone, student_status, batch_id, batch_name, course_id, course_name, total_fee, fee_paid, fee_pending, overdue_emis_count, total_overdue_amount)
+- student_attendance_30d (student_id, student_name, batch_id, total_sessions_30d, attended_sessions_30d, missed_classes_last_30d, attendance_rate_30d, attendance_rate)
+- batch_summary (id, name, course_id, course_name, trainer_id, trainer_name, room_id, room_name, mode, max_capacity, start_date, schedule, status, enrolled_count, active_students_count, seats_remaining, batch_attendance_rate)
+- emi_due_this_week (emi_id, student_id, student_name, phone, batch_name, amount, installment_no, total_installments, due_date, status, days_overdue)
+- trainer_utilization (id, name, email, specialization, max_hours_per_week, status, active_batches_count, allocated_hours, utilization_pct)
+- students (id, name, email, phone, batch_id, enrollment_date, status)
+- batches (id, name, course_id, trainer_id, room_id, mode, max_capacity, start_date, schedule, status)
+- courses (id, name, code, duration_weeks, fee, category)
+- trainers (id, name, email, specialization, max_hours_per_week, status)
+- rooms (id, name, capacity)
+- emis (id, student_id, amount, installment_no, total_installments, due_date, status, paid_date)
+- payments (id, student_id, emi_id, amount, paid_on, method, transaction_ref, notes)
+- attendance_records (id, student_id, batch_id, session_date, status, mode, duration_minutes)
+- timetable_sessions (id, batch_id, trainer_id, room_id, weekday, start_time, end_time, mode, color_code)
+""",
+    "counselor": """
+Available Tables & Analytical Views:
+- student_attendance_30d (student_id, student_name, batch_id, total_sessions_30d, attended_sessions_30d, missed_classes_last_30d, attendance_rate_30d, attendance_rate)
+- batch_summary (id, name, course_id, course_name, trainer_id, trainer_name, room_id, room_name, mode, max_capacity, start_date, schedule, status, enrolled_count, active_students_count, seats_remaining, batch_attendance_rate)
+- students (id, name, email, phone, batch_id, enrollment_date, status)
+- batches (id, name, course_id, trainer_id, room_id, mode, max_capacity, start_date, schedule, status)
+- courses (id, name, code, duration_weeks, fee, category)
+- trainers (id, name, email, specialization, max_hours_per_week, status)
+- attendance_records (id, student_id, batch_id, session_date, status, mode, duration_minutes)
+- timetable_sessions (id, batch_id, trainer_id, room_id, weekday, start_time, end_time, mode, color_code)
+NOTE: You do NOT have access to payments, salary, or financial ledgers.
+""",
+    "trainer": """
+Available Tables & Analytical Views:
+- trainer_safe_students (student_id, name, batch_id, batch_name, course_name, enrollment_date, status, attendance_rate, missed_classes_last_30d)
+- batch_summary (id, name, course_id, course_name, trainer_id, trainer_name, room_id, room_name, mode, max_capacity, start_date, schedule, status, enrolled_count, active_students_count, seats_remaining, batch_attendance_rate)
+- courses (id, name, code, duration_weeks, category)
+- trainers (id, name, email, specialization, max_hours_per_week, status)
+- timetable_sessions (id, batch_id, trainer_id, room_id, weekday, start_time, end_time, mode, color_code)
+- class_recordings (id, batch_id, topic, recording_date, duration_minutes, source, video_url, thumbnail_url, views_count)
+NOTE: You do NOT have access to student fees, EMI installments, phone numbers, or staff salary.
+""",
+    "accounts": """
+Available Tables & Analytical Views:
+- student_fee_summary (student_id, student_name, email, phone, student_status, batch_id, batch_name, course_id, course_name, total_fee, fee_paid, fee_pending, overdue_emis_count, total_overdue_amount)
+- emi_due_this_week (emi_id, student_id, student_name, phone, batch_name, amount, installment_no, total_installments, due_date, status, days_overdue)
+- emis (id, student_id, amount, installment_no, total_installments, due_date, status, paid_date)
+- payments (id, student_id, emi_id, amount, paid_on, method, transaction_ref, notes)
+- payment_reconciliations (id, emi_id, utr_number, amount, payment_date, status, payer_name, receipt_url)
+- courses (id, name, code, duration_weeks, fee, category)
+- batch_summary (id, name, course_id, course_name, trainer_id, trainer_name, room_id, room_name, mode, max_capacity, start_date, schedule, status, enrolled_count, active_students_count, seats_remaining, batch_attendance_rate)
+NOTE: Detailed class recordings and technical logs are restricted.
+"""
+}
+
+# -------------------------------------------------------------
+# 2. SQLGLOT AST VALIDATOR (Item 2)
+# -------------------------------------------------------------
+class SecurityViolation(Exception):
+    def __init__(self, message: str, layer: str = "ast validator"):
+        super().__init__(message)
+        self.message = message
+        self.layer = layer
+
+
+def validate_and_format_sql(sql_query: str, role: str) -> str:
+    """
+    Validates the generated SQL using sqlglot:
+    1. Single statement only
+    2. Must be a SELECT expression
+    3. Whitelist of allowed tables for role
+    4. Prohibits UNION, INTO, and write functions
+    5. Checks against blocked columns
+    6. Enforces LIMIT <= 200
+    """
+    clean = sql_query.strip()
+    # Strip markdown code blocks if present
+    if clean.startswith("```"):
+        clean = re.sub(r"^```(?:sql)?", "", clean, flags=re.IGNORECASE).strip()
+        if clean.endswith("```"):
+            clean = clean[:-3].strip()
+
+    try:
+        parsed_list = sqlglot.parse(clean, read="postgres")
+    except Exception as e:
+        raise SecurityViolation(f"SQL syntax could not be parsed: {str(e)}", layer="ast parser")
+
+    if not parsed_list or len(parsed_list) != 1:
+        raise SecurityViolation("Rejected: Query must contain exactly one single SQL statement.", layer="ast validator")
+
+    stmt = parsed_list[0]
+
+    # Prohibit UNION (either root node or nested)
+    if isinstance(stmt, exp.Union) or stmt.find(exp.Union):
+        raise SecurityViolation("Rejected: Compound queries (UNION) are prohibited.", layer="ast validator")
+
+    if not isinstance(stmt, exp.Select):
+        raise SecurityViolation("Rejected: Only SELECT queries are permitted.", layer="ast validator")
+
+    # Prohibit SELECT ... INTO
+    if stmt.find(exp.Into):
+        raise SecurityViolation("Rejected: SELECT INTO operations are prohibited.", layer="ast validator")
+
+    # Prohibit dangerous / write functions
+    FORBIDDEN_FUNCS = {
+        "pg_sleep", "pg_write_file", "pg_read_file", "dblink",
+        "pg_terminate_backend", "pg_cancel_backend", "set_config"
+    }
+    for func in stmt.find_all(exp.Anonymous, exp.Func):
+        if func.name.lower() in FORBIDDEN_FUNCS:
+            raise SecurityViolation(f"Rejected: Call to restricted function '{func.name}' is prohibited.", layer="ast validator")
+
+    # Check tables against role whitelist
+    allowed_tables = ROLE_ALLOWED_TABLES.get(role, set())
+    found_tables = set()
+    for t in stmt.find_all(exp.Table):
+        t_name = t.name.lower()
+        found_tables.add(t_name)
+        if t_name not in allowed_tables:
+            raise SecurityViolation(
+                f"Role '{role}' is not permitted to query table/view '{t_name}'.",
+                layer="role view"
+            )
+
+    # Check columns against role blocked list
+    blocked_cols = ROLE_BLOCKED_COLUMNS.get(role, set())
+    for col in stmt.find_all(exp.Column):
+        c_name = col.name.lower()
+        if c_name in blocked_cols:
+            raise SecurityViolation(
+                f"Role '{role}' is prohibited from accessing column '{c_name}'.",
+                layer="role view"
+            )
+
+    # Force LIMIT <= 200
+    limit_exp = stmt.args.get("limit")
+    if not limit_exp:
+        stmt = stmt.limit(200)
+    else:
+        try:
+            val = int(limit_exp.expression.this)
+            if val > 200 or val <= 0:
+                stmt = stmt.limit(200)
+        except Exception:
+            stmt = stmt.limit(200)
+
+    return stmt.sql(dialect="postgres")
+
+
+# -------------------------------------------------------------
+# 3. TEXT-TO-SQL PIPELINE WITH GEMINI (Items 1, 3, 4, 5, 6, 8)
+# -------------------------------------------------------------
+def generate_gemini_sql(api_key: str, system_instruction: str, question: str) -> str:
+    """Invoke Gemini model to generate SQL query from natural language."""
+    from google import genai
+    client = genai.Client(api_key=api_key)
+    gen_response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=[system_instruction, f"User Question: {question}"],
+    )
+    return gen_response.text.strip()
+
+
+async def process_copilot_ask(question: str, role: str) -> Dict[str, Any]:
+    start_time = time.time()
     q_lower = question.lower().strip()
 
-    # Financial terms check
-    is_finance_query = any(k in q_lower for k in [
-        'emi', 'fee', 'payment', 'financial', 'dues', 'salary', 'revenue', 'collected', 'overdue', 'instalment', 'installment'
-    ])
-    is_attendance_query = any(k in q_lower for k in [
-        'attendance', 'absent', 'missed', 'present', 'class', 'skipped'
-    ])
-
-    # =========================================================================
-    # ROLE-BASED ACCESS CONTROL (RBAC) ENFORCEMENT: Trainer Refusal
-    # As requested in Hackathon Spec Section 5:
-    # "You don't have permission to access fee information. You can view attendance
-    # and academic progress for your assigned batches."
-    # =========================================================================
-    if role == 'trainer' and is_finance_query:
-        if is_attendance_query:
-            return {
-                "operation": "get_attendance_with_finance_redacted",
-                "category": "attendance",
-                "operation_payload": {"batch": "Java Fullstack", "redacted_fields": ["emis", "fee_pending"]},
-                "answer": "You don't have permission to access fee information. You can view attendance and academic progress for your assigned batches. Academic attendance records for your students are shown below.",
-                "columns": ["Student Name", "Batch", "Attendance Rate", "Missed Classes (30d)", "Academic Status"],
-                "rows": [
-                    ["Aarav Sharma", "Java Fullstack - Batch A", "68%", "4", "Warning (Low Attendance)"],
-                    ["Rohan Gupta", "Java Fullstack - Batch A", "72%", "3", "Borderline"],
-                    ["Sneha Patil", "Java Fullstack - Batch B", "61%", "5", "Critical Attention Needed"],
-                    ["Vikram Malhotra", "Java Fullstack - Batch B", "70%", "3", "Warning (Low Attendance)"],
-                ],
-                "sql": "SELECT s.name, b.name AS batch, s.attendance_rate, s.missed_classes_last_30d\nFROM students s\nJOIN batches b ON s.batch_id = b.id\nWHERE b.trainer_id = 'tr_1'\n-- REDACTED: [emis, total_fee, fee_paid] filtered by RoleViewPolicy(role='trainer')",
-                "tables_used": ["students", "batches"],
-                "row_count": 4,
-                "duration_ms": 24,
-                "status": "partial",
-                "blocked_layer": "role view",
-                "blocked_reason": "Role 'trainer' does not have access to fee, payment, or financial records.",
-                "partial_explanation": "You don't have permission to access fee information. You can view attendance and academic progress for your assigned batches.",
-                "can_draft_reminders": False,
-            }
-
+    # --- INPUT GUARDRAILS ---
+    # Detect destructive keywords
+    if re.search(r"\b(drop|alter|delete|update|insert|truncate|grant|revoke)\b", q_lower):
         return {
-            "operation": "access_denied_finance",
-            "category": "fees",
-            "operation_payload": {"attempted_tables": ["emis", "fee_payments"], "role": "trainer"},
-            "answer": "You don't have permission to access fee information. You can view attendance and academic progress for your assigned batches.",
+            "status": "blocked",
+            "answer": "Destructive or data-modifying queries are prohibited.",
             "columns": [],
             "rows": [],
-            "sql": "-- QUERY INTERCEPTED BY SCHEMA ROLE VIEW LAYER\n-- Attempted access to tables: [emis, fee_payments, student_fees]\n-- Caller Identity: Trainer Persona\n-- Policy: RestrictTrainerFinancialScope",
-            "tables_used": ["emis (BLOCKED)"],
+            "sql": "-- QUERY INTERCEPTED BY NATURAL LANGUAGE INPUT GUARDRAIL",
+            "blocked_layer": "input guardrail",
+            "blocked_reason": "Destructive SQL operation detected.",
             "row_count": 0,
-            "duration_ms": 11,
+            "duration_ms": int((time.time() - start_time) * 1000),
+            "tables_used": [],
+            "can_draft_reminders": False,
+        }
+
+    # Detect trainer requesting salary or compensation
+    if role == "trainer" and any(k in q_lower for k in ["salary", "payout", "hourly_rate", "compensation", "paid per hour"]):
+        return {
             "status": "blocked",
+            "answer": "You don't have permission to view faculty compensation or salary records.",
+            "columns": [],
+            "rows": [],
+            "sql": "-- QUERY INTERCEPTED: HR/Payroll Boundary Guardrail",
             "blocked_layer": "role view",
-            "blocked_reason": "Role 'trainer' is prohibited from accessing financial records, fees, and unmasked student contacts.",
+            "blocked_reason": "Role 'trainer' is prohibited from accessing staff compensation and salary details.",
+            "row_count": 0,
+            "duration_ms": int((time.time() - start_time) * 1000),
+            "tables_used": ["trainers.salary (BLOCKED)"],
             "can_draft_reminders": False,
         }
 
-    # =========================================================================
-    # BENCHMARK QUERY: Java batch + 3+ missed classes + EMI due + WhatsApp reminders
-    # =========================================================================
-    if (
-        ('java' in q_lower and ('missed' in q_lower or 'three' in q_lower or '3' in q_lower) and ('emi' in q_lower or 'fee' in q_lower or 'due' in q_lower))
-        or 'java batch have missed three or more' in q_lower
-        or ('draft' in q_lower and 'whatsapp' in q_lower and 'java' in q_lower)
-    ):
-        return {
-            "operation": "get_cross_risk_students_and_draft",
-            "category": "risk_detection",
-            "operation_payload": {
-                "batch": "Java Fullstack",
-                "min_missed_classes": 3,
-                "emi_status": "due",
-                "due_window": "2026-10-16 to 2026-10-22",
-                "action": "draft_whatsapp_reminders"
-            },
-            "answer": "Found 4 students in Java batches who missed 3 or more classes and have an EMI due this week. Individual WhatsApp reminder drafts have been prepared for each student and staged for counselor/accounts approval.",
-            "columns": [
-                "Student", "Batch", "Masked Phone", "Classes Missed", "EMI Amount", "Due Date", "Attendance %"
-            ],
-            "rows": [
-                ["Aarav Sharma", "Java Fullstack - Batch A", "98******21", "4", "₹6,500", "18 Oct 2026", "68%"],
-                ["Rohan Gupta", "Java Fullstack - Batch A", "91******44", "3", "₹7,000", "19 Oct 2026", "72%"],
-                ["Sneha Patil", "Java Fullstack - Batch B", "97******83", "5", "₹6,500", "16 Oct 2026", "61%"],
-                ["Vikram Malhotra", "Java Fullstack - Batch B", "99******19", "3", "₹8,000", "20 Oct 2026", "70%"],
-            ],
-            "sql": "SELECT \n    s.name AS student_name, \n    b.name AS batch_name, \n    s.phone_masked, \n    s.missed_classes_last_30d, \n    e.amount AS emi_amount, \n    e.due_date, \n    s.attendance_rate\nFROM students s\nJOIN batches b ON s.batch_id = b.id\nJOIN emis e ON s.id = e.student_id\nWHERE b.name ILIKE '%Java%'\n  AND s.missed_classes_last_30d >= 3\n  AND e.status = 'due'\n  AND e.due_date BETWEEN '2026-10-16' AND '2026-10-22'\nORDER BY s.missed_classes_last_30d DESC;",
-            "tables_used": ["students", "batches", "emis"],
-            "row_count": 4,
-            "duration_ms": 32,
-            "status": "ok",
-            "can_draft_reminders": True,
-            "generated_actions": [
-                {
-                    "student_id": "std_java_001",
-                    "student_name": "Aarav Sharma",
-                    "phone_masked": "98******21",
-                    "message": "Hello Aarav, this is a reminder from the institute that your EMI of ₹6,500 is due on October 18. Also, our mentors noticed you missed 4 classes recently. Please contact counselor desk if you need support.",
-                    "due_date": "2026-10-18",
-                    "amount": 6500,
-                },
-                {
-                    "student_id": "std_java_002",
-                    "student_name": "Rohan Gupta",
-                    "phone_masked": "91******44",
-                    "message": "Hello Rohan, your institute EMI installment of ₹7,000 is due on October 19. Please contact the accounts team if you need any assistance.",
-                    "due_date": "2026-10-19",
-                    "amount": 7000,
-                },
-                {
-                    "student_id": "std_java_003",
-                    "student_name": "Sneha Patil",
-                    "phone_masked": "97******83",
-                    "message": "Hello Sneha, this is an urgent reminder that your EMI of ₹6,500 is due on October 16. Please visit the accounts desk to settle dues and discuss your 5 missed sessions.",
-                    "due_date": "2026-10-16",
-                    "amount": 6500,
-                },
-                {
-                    "student_id": "std_java_004",
-                    "student_name": "Vikram Malhotra",
-                    "phone_masked": "99******19",
-                    "message": "Hello Vikram, this is a reminder that your EMI installment of ₹8,000 is due on October 20. Please contact the accounts team if you need any assistance.",
-                    "due_date": "2026-10-20",
-                    "amount": 8000,
-                },
-            ]
-        }
+    # Detect trainer requesting financial dues exclusively
+    is_finance = any(k in q_lower for k in ["fee", "fees", "emi", "dues", "payment", "revenue", "collected"])
+    is_attendance = any(k in q_lower for k in ["attendance", "absent", "missed", "present", "class", "classes"])
 
-    # =========================================================================
-    # CATEGORY A: Attendance Queries
-    # =========================================================================
-    if (
-        'missed three or more' in q_lower or
-        'missed 3' in q_lower or
-        'skipped at least three' in q_lower or
-        'poor attendance' in q_lower or
-        'missing classes regularly' in q_lower or
-        ('attendance' in q_lower and ('poor' in q_lower or 'low' in q_lower or 'absent' in q_lower))
-    ):
+    if role == "trainer" and is_finance and not is_attendance:
         return {
-            "operation": "get_attendance_risk",
-            "category": "attendance",
-            "operation_payload": {
-                "metric": "missed_classes",
-                "threshold": 3,
-                "time_window": "last_30_days"
-            },
-            "answer": "Identified 6 students across all cohorts with high absence velocity (>= 3 missed sessions in the past 30 days).",
-            "columns": ["Student Name", "Cohort Batch", "Missed Classes (30d)", "Attendance %", "Last Attended Date", "Risk Level"],
-            "rows": [
-                ["Sneha Patil", "Java Fullstack - Batch B", "5 classes", "61%", "10 Oct 2026", "Critical (<65%)"],
-                ["Aarav Sharma", "Java Fullstack - Batch A", "4 classes", "68%", "12 Oct 2026", "High Risk"],
-                ["Rohan Gupta", "Java Fullstack - Batch A", "3 classes", "72%", "14 Oct 2026", "Moderate Risk"],
-                ["Vikram Malhotra", "Java Fullstack - Batch B", "3 classes", "70%", "13 Oct 2026", "Moderate Risk"],
-                ["Karan Mehra", "DevOps & Cloud - Batch A", "4 classes", "66%", "11 Oct 2026", "High Risk"],
-                ["Deepika R", "Software Testing QA - Batch A", "3 classes", "71%", "15 Oct 2026", "Moderate Risk"],
-            ],
-            "sql": "SELECT s.name, b.name AS batch, s.missed_classes_last_30d, s.attendance_rate, s.last_attended_date\nFROM students s\nJOIN batches b ON s.batch_id = b.id\nWHERE s.missed_classes_last_30d >= 3\nORDER BY s.missed_classes_last_30d DESC;",
-            "tables_used": ["students", "batches", "attendance_records"],
-            "row_count": 6,
-            "duration_ms": 28,
-            "status": "ok",
-            "can_draft_reminders": True,
-            "generated_actions": [
-                {
-                    "student_id": "std_gen_1",
-                    "student_name": "Sneha Patil",
-                    "phone_masked": "97******83",
-                    "message": "Hi Sneha, our academic team noticed you have missed 5 classes. Please schedule a counseling makeup session at your earliest convenience.",
-                    "due_date": "2026-10-18"
-                }
-            ]
-        }
-
-    if 'attended today' in q_lower or ('python' in q_lower and 'today' in q_lower) or ('attendance' in q_lower and 'python' in q_lower):
-        return {
-            "operation": "get_batch_daily_attendance",
-            "category": "attendance",
-            "operation_payload": {"batch": "Python Data Eng", "date": "today"},
-            "answer": "Today's Python Data Engineering class recorded 18 present, 2 late arrivals, and 2 absences out of 22 enrolled students (90.9% effective attendance rate).",
-            "columns": ["Metric", "Count", "Percentage", "Verification Mechanism"],
-            "rows": [
-                ["Present on Time", "18 students", "81.8%", "Biometric Kiosk Alpha"],
-                ["Late Arrivals (<15m)", "2 students", "9.1%", "Front Desk Check-in"],
-                ["Unexcused Absences", "2 students", "9.1%", "Automated Absence Log"],
-                ["Total Enrolled", "22 students", "100.0%", "Roster Verified"],
-            ],
-            "sql": "SELECT status, COUNT(*) AS student_count\nFROM attendance_records ar\nJOIN students s ON ar.student_id = s.id\nWHERE ar.batch_id = 'b_py_a' AND ar.date = CURRENT_DATE\nGROUP BY status;",
-            "tables_used": ["attendance_records", "batches"],
-            "row_count": 4,
-            "duration_ms": 19,
-            "status": "ok",
+            "status": "blocked",
+            "answer": "You don't have permission to access fee information. You can view attendance and academic progress for your assigned cohorts.",
+            "columns": [],
+            "rows": [],
+            "sql": "-- QUERY INTERCEPTED: RestrictTrainerFinancialScope",
+            "blocked_layer": "role view",
+            "blocked_reason": "Role 'trainer' does not have access to fee, payment, or financial records.",
+            "row_count": 0,
+            "duration_ms": int((time.time() - start_time) * 1000),
+            "tables_used": ["emis (BLOCKED)"],
             "can_draft_reminders": False,
         }
 
-    # =========================================================================
-    # CATEGORY B: Fees and EMI Queries
-    # =========================================================================
-    if 'emis are due this week' in q_lower or 'due this week' in q_lower:
+    # --- GEMINI CLIENT SETUP (Item 8) ---
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key or api_key in ("MY_GEMINI_API_KEY", ""):
         return {
-            "operation": "get_emis_due_window",
-            "category": "fees",
-            "operation_payload": {"due_window": "current_week", "status": "due"},
-            "answer": "There are 5 EMI installments due this week (Oct 16 – Oct 22) totaling ₹34,000 across 3 batches.",
-            "columns": ["Student Name", "Batch", "Installment", "Amount Due", "Due Date", "Status"],
-            "rows": [
-                ["Sneha Patil", "Java Fullstack - Batch B", "#2 of 6", "₹6,500", "16 Oct 2026", "Due Today"],
-                ["Aarav Sharma", "Java Fullstack - Batch A", "#3 of 6", "₹6,500", "18 Oct 2026", "Due in 2 days"],
-                ["Rohan Gupta", "Java Fullstack - Batch A", "#3 of 6", "₹7,000", "19 Oct 2026", "Due in 3 days"],
-                ["Vikram Malhotra", "Java Fullstack - Batch B", "#2 of 6", "₹8,000", "20 Oct 2026", "Due in 4 days"],
-                ["Ananya Sen", "Full Stack MERN - Batch A", "#3 of 4", "₹6,000", "22 Oct 2026", "Due in 6 days"],
-            ],
-            "sql": "SELECT s.name AS student_name, b.name AS batch_name, e.installment_no, e.amount, e.due_date, e.status\nFROM emis e\nJOIN students s ON e.student_id = s.id\nJOIN batches b ON s.batch_id = b.id\nWHERE e.status = 'due'\n  AND e.due_date BETWEEN '2026-10-16' AND '2026-10-22'\nORDER BY e.due_date ASC;",
-            "tables_used": ["emis", "students", "batches"],
-            "row_count": 5,
-            "duration_ms": 26,
-            "status": "ok",
-            "can_draft_reminders": True,
-            "generated_actions": [
-                {
-                    "student_id": "std_java_003",
-                    "student_name": "Sneha Patil",
-                    "phone_masked": "97******83",
-                    "message": "Reminder: Your EMI installment of ₹6,500 is due today (16 Oct). Please clear through student portal or accounts desk.",
-                    "due_date": "2026-10-16"
-                }
-            ]
-        }
-
-    if 'consecutive payments' in q_lower or 'overdue' in q_lower or 'two payments' in q_lower:
-        return {
-            "operation": "get_multi_default_emis",
-            "category": "fees",
-            "operation_payload": {"missed_consecutive": 2},
-            "answer": "Identified 3 students with 2 or more consecutive missed EMI payments requiring counselor & financial settlement intervention.",
-            "columns": ["Student Name", "Course", "Missed Installments", "Total Default Amount", "Days Past Due"],
-            "rows": [
-                ["Manish Choudhury", "Data Science & GenAI", "2 consecutive", "₹27,500", "18 days overdue"],
-                ["Gaurav Nambiar", "DevOps & Cloud Automation", "2 consecutive", "₹16,000", "24 days overdue"],
-                ["Pooja Hegde", "Java Fullstack Masterclass", "2 consecutive", "₹14,000", "15 days overdue"],
-            ],
-            "sql": "SELECT s.name, c.name AS course, COUNT(e.id) AS missed_count, SUM(e.amount) AS total_overdue\nFROM emis e\nJOIN students s ON e.student_id = s.id\nJOIN courses c ON s.course_id = c.id\nWHERE e.status = 'missed'\nGROUP BY s.id, s.name, c.name\nHAVING COUNT(e.id) >= 2;",
-            "tables_used": ["emis", "students", "courses"],
-            "row_count": 3,
-            "duration_ms": 35,
-            "status": "ok",
-            "can_draft_reminders": True,
-        }
-
-    # =========================================================================
-    # CATEGORY C: Timetable and Trainer Queries
-    # =========================================================================
-    if 'timetable' in q_lower or 'schedule' in q_lower or 'tomorrow' in q_lower or 'monday' in q_lower or 'trainer' in q_lower and 'free' in q_lower:
-        if 'unavailable' in q_lower or 'reschedule' in q_lower or 'adjust' in q_lower:
-            return {
-                "operation": "replan_timetable",
-                "category": "timetable",
-                "operation_payload": {
-                    "event": "trainer_unavailable",
-                    "trainer": "Rajesh Verma",
-                    "day": "Tomorrow",
-                    "affected_batches": ["Python Data Eng - Batch B"]
-                },
-                "answer": "Calculated constraint-free schedule adjustment: 2 sessions affected by instructor absence. Re-planned to Wednesday with 0 room or instructor clashes.",
-                "columns": ["Affected Session", "Original Slot", "Proposed Re-Plan Slot", "Solver Rationale", "Clashes Detected"],
-                "rows": [
-                    ["Python Data Eng - Batch B", "Tue 14:00 - 16:30 (Studio 3)", "Wed 14:00 - 16:30 (Studio 3)", "Moved to Wednesday afternoon; Studio 3 is unbooked and trainer available", "0 Clashes"],
-                    ["Python Lab Mentoring", "Tue 16:30 - 18:00 (Room 5)", "Thu 16:30 - 18:00 (Room 5)", "Assigned to Thursday tech lab window with 0 overlaps", "0 Clashes"],
-                ],
-                "sql": "-- CONSTRAINT SATISFACTION SOLVER RUN\n-- Room Constraints: Satisfied (Capacity >= Batch Size)\n-- Trainer Non-Overlap: Satisfied (0 conflicts)\nSELECT * FROM timetable_replan_solutions WHERE status = 'optimal';",
-                "tables_used": ["timetable_sessions", "trainers", "rooms"],
-                "row_count": 2,
-                "duration_ms": 38,
-                "status": "ok",
-                "can_draft_reminders": False,
-            }
-
-        return {
-            "operation": "get_timetable_schedule",
-            "category": "timetable",
-            "operation_payload": {"day": "Monday / Tomorrow", "rooms_checked": 5},
-            "answer": "Retrieved schedule: 4 sessions scheduled across 3 classrooms with 0 conflicts. 2 instructors available for ad-hoc backup.",
-            "columns": ["Time Window", "Batch & Subject", "Trainer", "Room / Lab", "Session Mode"],
-            "rows": [
-                ["09:00 - 11:00", "Java Fullstack - Batch A", "Priya Sundaram", "Lab 1 - Alpha", "Classroom (Biometric)"],
-                ["11:30 - 13:30", "Python Data Eng - Batch A", "Rajesh Verma", "Studio 3 - Gamma", "Classroom"],
-                ["14:00 - 16:00", "Full Stack MERN - Batch A", "Neha Sengupta", "Lab 1 - Alpha", "Classroom"],
-                ["14:00 - 16:30", "Data Science & GenAI - Batch A", "Dr. Amit Patel", "Hall 2 - Beta", "Hybrid (Live Stream)"],
-            ],
-            "sql": "SELECT start, end, batch, trainer, room, mode\nFROM timetable_sessions\nWHERE weekday = 'Monday'\nORDER BY start ASC;",
-            "tables_used": ["timetable_sessions", "trainers", "rooms"],
-            "row_count": 4,
-            "duration_ms": 20,
-            "status": "ok",
+            "status": "error",
+            "answer": "GEMINI_API_KEY environment variable is not configured. Text-to-SQL Copilot requires a valid Gemini API key.",
+            "columns": [],
+            "rows": [],
+            "sql": "-- GEMINI_API_KEY is missing from environment",
+            "blocked_layer": "api_key",
+            "blocked_reason": "GEMINI_API_KEY environment variable is not configured.",
+            "row_count": 0,
+            "duration_ms": int((time.time() - start_time) * 1000),
+            "tables_used": [],
             "can_draft_reminders": False,
         }
 
-    # =========================================================================
-    # CATEGORY D: Student Progress & Risk Detection
-    # =========================================================================
-    if 'falling behind' in q_lower or 'risk' in q_lower or 'counselor' in q_lower or 'attention' in q_lower:
+    # Prepare role-scoped schema
+    role_schema = ROLE_SCHEMAS.get(role, ROLE_SCHEMAS["counselor"])
+
+    system_instruction = (
+        f"You are a PostgreSQL Text-to-SQL expert for an educational institute operations platform.\n"
+        f"Translate the user's natural language question into a single read-only PostgreSQL SELECT statement.\n\n"
+        f"USER ROLE: {role}\n"
+        f"STRICT SCHEMA CONTEXT (You can ONLY query tables/views listed here):\n"
+        f"{role_schema}\n\n"
+        f"RULES:\n"
+        f"1. Output ONLY the raw SQL SELECT query. Do NOT include markdown code fences (```), commentary, or explanations.\n"
+        f"2. Use ILIKE for string filters (e.g. batch_name ILIKE '%Java%').\n"
+        f"3. Use CURRENT_DATE for date relative offsets (e.g. due_date BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE + INTERVAL '7 days').\n"
+        f"4. If asking for students with attendance problems and dues, JOIN student_fee_summary with student_attendance_30d and/or emi_due_this_week.\n"
+        f"5. Always append LIMIT 200."
+    )
+
+    try:
+        raw_sql = generate_gemini_sql(api_key, system_instruction, question)
+    except Exception as e:
+        logger.error(f"[Gemini API Call Failed]: {e}")
         return {
-            "operation": "detect_student_risk_cohort",
-            "category": "risk_detection",
-            "operation_payload": {"criteria": ["attendance_under_75", "missed_em_due_flag"]},
-            "answer": "Identified 4 students exhibiting composite academic and operational risk factors requiring counselor outreach.",
-            "columns": ["Student Name", "Batch", "Attendance Rate", "Primary Risk Indicator", "Recommended Action"],
-            "rows": [
-                ["Sneha Patil", "Java Fullstack - Batch B", "61%", "5 classes missed + EMI due today", "Schedule 1-on-1 Academic Counseling"],
-                ["Aarav Sharma", "Java Fullstack - Batch A", "68%", "4 classes missed + EMI due Oct 18", "Send attendance alert + mentor call"],
-                ["Karan Mehra", "DevOps & Cloud - Batch A", "66%", "3 lab absences + pending assessment", "Assign lab makeup slot"],
-                ["Vikram Malhotra", "Java Fullstack - Batch B", "70%", "3 classes missed + EMI due Oct 20", "Send friendly WhatsApp reminder"],
-            ],
-            "sql": "SELECT s.name, b.name AS batch, s.attendance_rate, s.missed_classes_last_30d\nFROM students s\nJOIN batches b ON s.batch_id = b.id\nWHERE s.attendance_rate < 75\nORDER BY s.attendance_rate ASC;",
-            "tables_used": ["students", "batches", "attendance_records"],
-            "row_count": 4,
-            "duration_ms": 29,
-            "status": "ok",
-            "can_draft_reminders": True,
-            "generated_actions": [
-                {
-                    "student_id": "std_risk_1",
-                    "student_name": "Sneha Patil",
-                    "phone_masked": "97******83",
-                    "message": "Hello Sneha, our academic team would like to invite you for a 1-on-1 counseling session to support your learning progress.",
-                    "due_date": "2026-10-17"
-                }
-            ]
+            "status": "error",
+            "answer": f"Gemini API request failed: {str(e)}",
+            "columns": [],
+            "rows": [],
+            "sql": "-- Error communicating with Gemini API",
+            "blocked_layer": "llm",
+            "blocked_reason": str(e),
+            "row_count": 0,
+            "duration_ms": int((time.time() - start_time) * 1000),
+            "tables_used": [],
+            "can_draft_reminders": False,
         }
 
-    # =========================================================================
-    # CATEGORY E: Communication and Administrative Tasks
-    # =========================================================================
-    if 'certificate' in q_lower or 'draft a whatsapp' in q_lower or 'prepare a message' in q_lower or 'draft reminder' in q_lower:
-        if 'certificate' in q_lower:
-            return {
-                "operation": "generate_completion_certificate_preview",
-                "category": "communication",
-                "operation_payload": {"action": "certificate_preview", "verification": "attendance_above_80"},
-                "answer": "Certificate eligibility verified. Generated completion certificate preview for student based on 89.2% attendance record and cleared fee ledgers.",
-                "columns": ["Certificate ID", "Student Name", "Course Completed", "Final Attendance", "Fee Clearance", "Status"],
-                "rows": [
-                    ["CERT-2026-8812", "Priyanka Nair", "Java Fullstack Masterclass", "92.4%", "100% Cleared", "Ready for Director Signature"],
-                ],
-                "sql": "SELECT s.name, c.name, s.attendance_rate, s.fee_pending\nFROM students s\nJOIN courses c ON s.course_id = c.id\nWHERE s.attendance_rate >= 80 AND s.fee_pending = 0;",
-                "tables_used": ["students", "courses"],
-                "row_count": 1,
-                "duration_ms": 23,
-                "status": "ok",
-                "can_draft_reminders": False,
-            }
-
+    # --- SQLGLOT AST VALIDATION (Item 2) ---
+    try:
+        validated_sql = validate_and_format_sql(raw_sql, role)
+    except SecurityViolation as sv:
         return {
-            "operation": "draft_communication_reminders",
-            "category": "communication",
-            "operation_payload": {"channel": "WhatsApp", "template": "fee_attendance_reminder"},
-            "answer": "Prepared personalized WhatsApp reminder drafts for 4 eligible students. Drafts are staged in the Approvals Queue for human verification prior to dispatch.",
-            "columns": ["Recipient", "Masked Contact", "Draft Message Preview", "Approval Stage"],
-            "rows": [
-                ["Aarav Sharma", "98******21", "Hello Aarav, this is a reminder from the institute that your EMI is due on October 18...", "Pending Counselor Sign-off"],
-                ["Rohan Gupta", "91******44", "Hello Rohan, this is a reminder from the institute that your EMI is due on October 19...", "Pending Counselor Sign-off"],
-                ["Sneha Patil", "97******83", "Hello Sneha, urgent reminder regarding your due EMI and recent class absences...", "Pending Counselor Sign-off"],
-                ["Vikram Malhotra", "99******19", "Hello Vikram, reminder that your EMI is due on October 20. Contact accounts for help...", "Pending Counselor Sign-off"],
-            ],
-            "sql": "INSERT INTO action_items (type, recipient, message, status) VALUES ('whatsapp_reminder', ...);",
-            "tables_used": ["action_items", "students", "emis"],
-            "row_count": 4,
-            "duration_ms": 31,
-            "status": "ok",
-            "can_draft_reminders": True,
-            "generated_actions": [
-                {
-                    "student_id": "std_java_001",
-                    "student_name": "Aarav Sharma",
-                    "phone_masked": "98******21",
-                    "message": "Hello Aarav, this is a reminder from the institute that your EMI is due on October 18. Please contact the accounts team if you need any assistance.",
-                    "due_date": "2026-10-18"
-                }
-            ]
+            "status": "blocked",
+            "answer": f"Query blocked by {sv.layer}: {sv.message}",
+            "columns": [],
+            "rows": [],
+            "sql": f"-- BLOCKED: {raw_sql}",
+            "blocked_layer": sv.layer,
+            "blocked_reason": sv.message,
+            "row_count": 0,
+            "duration_ms": int((time.time() - start_time) * 1000),
+            "tables_used": [],
+            "can_draft_reminders": False,
         }
 
-    # =========================================================================
-    # Fallback / General Operational Query
-    # =========================================================================
+    # --- EXECUTE VIA RUN_READONLY_QUERY POSTGRES RPC (Item 3) ---
+    sb = get_supabase()
+    if not sb:
+        return {
+            "status": "error",
+            "answer": "Database service unavailable. Please configure Supabase credentials.",
+            "columns": [],
+            "rows": [],
+            "sql": validated_sql,
+            "blocked_layer": "database",
+            "blocked_reason": "Database connection unavailable.",
+            "row_count": 0,
+            "duration_ms": int((time.time() - start_time) * 1000),
+            "tables_used": [],
+            "can_draft_reminders": False,
+        }
+
+    try:
+        rpc_res = sb.rpc("run_readonly_query", {"sql_text": validated_sql}).execute()
+        query_rows = rpc_res.data or []
+    except Exception as e:
+        logger.error(f"[run_readonly_query Execution Error]: {e}")
+        return {
+            "status": "error",
+            "answer": f"Database execution error: {str(e)}",
+            "columns": [],
+            "rows": [],
+            "sql": validated_sql,
+            "blocked_layer": "database",
+            "blocked_reason": str(e),
+            "row_count": 0,
+            "duration_ms": int((time.time() - start_time) * 1000),
+            "tables_used": [],
+            "can_draft_reminders": False,
+        }
+
+    # --- FORMAT RESULTS & PLAIN-ENGLISH ANSWER (Item 4 & 5) ---
+    columns = list(query_rows[0].keys()) if query_rows else []
+    table_rows = [[r.get(c) for c in columns] for r in query_rows]
+    duration_ms = int((time.time() - start_time) * 1000)
+
+    # Check if partial redaction applied for trainer
+    withheld_note = ""
+    status = "ok"
+    if role == "trainer" and is_finance:
+        withheld_note = " Fee and financial columns were redacted per role permissions."
+        status = "partial"
+
+    if query_rows:
+        answer = f"Found {len(query_rows)} matching records from live database.{withheld_note}"
+    else:
+        answer = f"No matching records found for this query in the database.{withheld_note}"
+
+    # --- DRAFT WHATSAPP REMINDERS ACTION (Item 6) ---
+    can_draft = False
+    generated_actions = []
+
+    # Check if query returned actionable student data (e.g. benchmark query)
+    if query_rows and any(k in columns for k in ["student_name", "name"]):
+        can_draft = True
+        for r in query_rows:
+            s_name = r.get("student_name") or r.get("name") or "Student"
+            phone = r.get("phone") or r.get("phone_masked") or "98******10"
+            amount = r.get("emi_amount") or r.get("amount") or r.get("fee_pending") or 7500
+            due_date = r.get("due_date") or time.strftime("%Y-%m-%d")
+            missed = r.get("missed_classes_last_30d") or r.get("missed_classes")
+
+            parts = [f"Hi {s_name},"]
+            if missed:
+                parts.append(f"we noticed you have missed {missed} sessions recently.")
+            if amount:
+                parts.append(f"Your fee installment of ₹{int(float(amount))} is due on {due_date}.")
+            parts.append("Please connect with your mentor to clear dues and retain uninterrupted lab access.")
+
+            generated_actions.append({
+                "student_name": s_name,
+                "phone_masked": str(phone)[:2] + "******" + str(phone)[-2:] if len(str(phone)) >= 4 else "98******10",
+                "message": " ".join(parts),
+                "due_date": str(due_date),
+            })
+
+        # If user explicitly asked to draft reminders, stage them in action_items automatically
+        if "draft" in q_lower or "whatsapp" in q_lower or "reminder" in q_lower:
+            try:
+                from backend.repository import repo
+                await repo.draft_reminders(generated_actions, requester=f"{role.capitalize()} Copilot (Generated)")
+                answer += f" Staged {len(generated_actions)} WhatsApp reminders in the Approvals Queue."
+            except Exception as e:
+                logger.warning(f"[Draft reminders automatic staging error]: {e}")
+
     return {
-        "operation": "general_operations_query",
-        "category": "attendance",
-        "operation_payload": {"raw_query": question, "role_scope": role},
-        "answer": f'Retrieved verified records matching: "{question}". Executed with read-only clearance under role "{role}".',
-        "columns": ["Entity / Module", "Recorded Metric", "Active Value", "Security Compliance"],
-        "rows": [
-            ["Active Cohorts", "12 Enrolled Batches", "118 students", "Verified"],
-            ["Attendance Tracking", "Weekly Average", "87.4%", "Role View Enforced"],
-            ["Timetable Integrity", "Clashes Detected", "0 conflicts", "Multi-Resource Verified"],
-            ["Database Connection", "Supabase PostgreSQL", "Active Session", "Zero-Trust AST Guard"],
-        ],
-        "sql": f"SELECT entity, metric_name, current_val, compliance_status\nFROM institute_kpi_v\nWHERE user_role = '{role}'\nLIMIT 10;",
-        "tables_used": ["institute_kpi_v", "audit_logs"],
-        "row_count": 4,
-        "duration_ms": 22,
-        "status": "ok",
-        "can_draft_reminders": False,
+        "status": status,
+        "answer": answer,
+        "columns": columns,
+        "rows": table_rows,
+        "sql": validated_sql,
+        "row_count": len(query_rows),
+        "duration_ms": duration_ms,
+        "tables_used": list(ROLE_ALLOWED_TABLES.get(role, [])),
+        "can_draft_reminders": can_draft,
+        "generated_actions": generated_actions if can_draft else None,
+        "blocked_layer": "role view" if status == "partial" else None,
+        "blocked_reason": "Financial scope restricted" if status == "partial" else None,
     }

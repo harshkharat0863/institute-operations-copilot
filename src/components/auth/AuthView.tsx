@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Sparkles,
   ShieldCheck,
   Users,
   GraduationCap,
@@ -18,10 +17,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { useTheme } from '../../context/ThemeContext';
 import { ThemeToggle } from '../common/ThemeToggle';
-import { DEMO_USERS } from '../../lib/mock/data';
+import { DEMO_ACCOUNTS } from '../../lib/demoAccounts';
 import { UserRole } from '../../types';
+import { Button } from '../common/Button';
 
 interface RoleOption {
   role: UserRole;
@@ -29,7 +28,6 @@ interface RoleOption {
   subtitle: string;
   icon: React.ElementType;
   badge: string;
-  badgeColor: string;
 }
 
 const ROLES_LIST: RoleOption[] = [
@@ -39,43 +37,38 @@ const ROLES_LIST: RoleOption[] = [
     subtitle: 'Executive oversight, full system clearance, financial control & red-team audit',
     icon: Building2,
     badge: 'Full Access',
-    badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
   },
   {
     role: 'counselor',
     title: 'Academic Counselor',
     subtitle: 'Student onboarding, dropout risk radar, failure chain intervention & copilot',
     icon: Users,
-    badge: 'Mentorship',
-    badgeColor: 'bg-sky-50 text-sky-700 border-sky-200',
+    badge: 'Counseling',
   },
   {
     role: 'trainer',
-    title: 'Batch Trainer / Faculty',
+    title: 'Batch Trainer',
     subtitle: 'Assigned cohorts, timetable schedules, classroom logs & lecture recordings',
     icon: GraduationCap,
-    badge: 'Teaching Scope',
-    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    badge: 'Faculty',
   },
   {
     role: 'accounts',
     title: 'Accounts & Finance',
     subtitle: 'Fee ledgers, EMI installments, payment OCR reconciliation & reminder dispatches',
     icon: Receipt,
-    badge: 'Financial Scope',
-    badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
+    badge: 'Financial',
   },
 ];
 
 interface AuthViewProps {
   initialMode?: 'signin' | 'signup';
-  onBackToHome: () => void;
+  onBackToHome?: () => void;
 }
 
 export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'signin', onBackToHome }) => {
   const { login, register, isLoading } = useAuth();
   const { showToast } = useToast();
-  const { isDark } = useTheme();
 
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>(initialMode);
 
@@ -94,13 +87,12 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'signin', onBa
   const [signupSpecialization, setSignupSpecialization] = useState('Java, Spring Boot');
   const [showSignupPassword, setShowSignupPassword] = useState(false);
 
-  // Quick Demo Role Click
   const handleSelectDemoRole = (role: UserRole) => {
     setSelectedDemoRole(role);
-    const demo = DEMO_USERS[role];
+    const demo = DEMO_ACCOUNTS[role];
     if (demo) {
       setEmail(demo.email);
-      setPassword('password123');
+      setPassword(demo.password);
     }
   };
 
@@ -110,11 +102,16 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'signin', onBa
       showToast('Please enter your email address', 'error');
       return;
     }
+    if (!password) {
+      showToast('Please enter your password', 'error');
+      return;
+    }
     try {
-      await login(email, selectedDemoRole);
-      showToast(`Welcome back! Signed in as ${selectedDemoRole.toUpperCase()}`, 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Authentication failed. Please verify credentials.', 'error');
+      await login(email.trim(), password);
+      showToast('Welcome back! Signed in successfully.', 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Authentication failed';
+      showToast(msg, 'error');
     }
   };
 
@@ -141,69 +138,61 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'signin', onBa
         signupRole,
         signupRole === 'trainer' ? signupSpecialization : undefined
       );
-      showToast(`Account created! Welcome to InstituteOps, ${signupName}`, 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Registration failed. Please try again.', 'error');
+      showToast(`Account created! Welcome, ${signupName}`, 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Registration failed';
+      showToast(msg, 'error');
     }
   };
 
   return (
-    <div className={`min-h-screen flex flex-col justify-between p-4 sm:p-6 lg:p-8 antialiased font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200 ${
-      isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
-    }`}>
+    <div className="min-h-screen flex flex-col justify-between p-4 sm:p-6 lg:p-8 antialiased font-sans bg-bg text-text">
       {/* Top Header Bar */}
-      <div className="max-w-4xl w-full mx-auto flex items-center justify-between pb-4 gap-3">
+      <div className="max-w-xl w-full mx-auto flex items-center justify-between pb-6 gap-3">
         <button
           onClick={onBackToHome}
-          className={`inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
-            isDark
-              ? 'text-slate-400 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-              : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:border-slate-300 shadow-xs'
-          }`}
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-[6px] border border-border bg-surface text-text-muted hover:text-text hover:bg-surface-subtle transition-colors cursor-pointer"
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Back to Project Overview</span>
+          <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <span>Overview</span>
         </button>
 
-        <div className="flex items-center gap-3">
-          <ThemeToggle variant="segmented" />
+        <div className="flex items-center gap-2.5">
+          <ThemeToggle variant="button" />
 
-          <div className={`flex items-center gap-2 text-xs px-2.5 py-1 rounded-lg border ${
-            isDark ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-600 shadow-xs'
-          }`}>
-            <Database className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden sm:inline">Database Active</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-[6px] border border-border bg-surface text-text-muted">
+            <Database className="w-3.5 h-3.5 text-status-green" strokeWidth={1.5} />
+            <span className="hidden sm:inline">Postgres 3NF</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-status-green" />
           </div>
         </div>
       </div>
 
       {/* Main Auth Card Container */}
       <div className="max-w-xl w-full mx-auto my-auto">
-        <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 text-slate-900">
-          
-          {/* Top Brand Logo */}
-          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white shadow-md shadow-indigo-600/30 ring-1 ring-white/20">
-              <Sparkles className="w-4 h-4 text-indigo-100" />
+        <div className="bg-surface rounded-[8px] p-6 sm:p-8 border border-border">
+          {/* Brand Heading */}
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border">
+            <div className="w-8 h-8 rounded-[6px] bg-accent flex items-center justify-center text-white">
+              <Building2 className="w-4 h-4" strokeWidth={1.5} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900 text-base tracking-tight">InstituteOps</span>
-              </div>
-              <p className="text-[11px] text-slate-500">Institute Operations & AI Copilot Desk</p>
+              <span className="font-serif text-lg font-medium tracking-tight text-text">
+                Institute Operations Copilot
+              </span>
+              <p className="text-xs text-text-muted">Relational Admin & Operations Console</p>
             </div>
           </div>
 
-          {/* Segmented Switcher: Sign In vs Create Account */}
-          <div className="flex items-center p-1 bg-slate-100 rounded-xl mb-6">
+          {/* Segmented Switcher */}
+          <div className="flex items-center p-0.5 bg-surface-subtle border border-border rounded-[6px] mb-6">
             <button
               type="button"
               onClick={() => setAuthMode('signin')}
-              className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+              className={`flex-1 py-1.5 text-xs font-medium rounded-[4px] transition-colors cursor-pointer ${
                 authMode === 'signin'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-surface text-text border border-border shadow-xs'
+                  : 'text-text-muted hover:text-text'
               }`}
             >
               Sign In
@@ -211,38 +200,36 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'signin', onBa
             <button
               type="button"
               onClick={() => setAuthMode('signup')}
-              className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+              className={`flex-1 py-1.5 text-xs font-medium rounded-[4px] transition-colors cursor-pointer ${
                 authMode === 'signup'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-surface text-text border border-border shadow-xs'
+                  : 'text-text-muted hover:text-text'
               }`}
             >
-              Create Account
+              Register Account
             </button>
           </div>
 
-          {/* ===============================================================
-              TAB 1: SIGN IN MODE
-              =============================================================== */}
+          {/* TAB 1: SIGN IN */}
           {authMode === 'signin' && (
             <div className="space-y-5">
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                  Welcome back
+                <h2 className="font-serif text-xl sm:text-2xl font-medium tracking-tight text-text">
+                  Sign In
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Sign in to your institute operations console
+                <p className="text-xs text-text-muted mt-0.5">
+                  Enter your credentials or choose a pre-seeded persona
                 </p>
               </div>
 
-              {/* Quick 1-Click Role Presets */}
+              {/* Demo Accounts */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    Quick One-Click Demo Access
+                  <span className="text-[10px] font-semibold text-text-subtle uppercase tracking-wider">
+                    Demo Accounts
                   </span>
-                  <span className="text-[10px] text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
-                    One-Click Fill
+                  <span className="text-[10px] text-text-muted font-mono bg-surface-subtle px-1.5 py-0.5 rounded-[4px] border border-border">
+                    pwd: password123
                   </span>
                 </div>
 
@@ -250,27 +237,28 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'signin', onBa
                   {ROLES_LIST.map(item => {
                     const isSelected = selectedDemoRole === item.role;
                     const Icon = item.icon;
+                    const demo = DEMO_ACCOUNTS[item.role];
                     return (
                       <button
                         key={item.role}
                         type="button"
                         onClick={() => handleSelectDemoRole(item.role)}
-                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        className={`p-2.5 rounded-[6px] border text-left transition-colors cursor-pointer flex flex-col justify-between ${
                           isSelected
-                            ? 'bg-indigo-50/80 border-indigo-500 ring-1 ring-indigo-500'
-                            : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200'
+                            ? 'bg-accent-subtle border-accent/40 text-accent-text'
+                            : 'bg-surface hover:bg-surface-subtle border-border text-text'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <Icon className={`w-4 h-4 ${isSelected ? 'text-indigo-600' : 'text-slate-500'}`} />
-                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />}
+                          <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-accent" strokeWidth={1.5} />}
                         </div>
                         <div className="mt-2">
-                          <div className={`text-xs font-bold leading-tight ${isSelected ? 'text-indigo-950' : 'text-slate-900'}`}>
+                          <div className="text-xs font-medium leading-tight">
                             {item.title.split(' ')[0]}
                           </div>
-                          <div className="text-[10px] text-slate-500 truncate mt-0.5">
-                            {item.role === 'owner' ? 'Full Control' : item.role === 'counselor' ? 'Students & Risk' : item.role === 'trainer' ? 'Schedules' : 'Fees & EMIs'}
+                          <div className="text-[10px] text-text-muted font-mono truncate mt-0.5">
+                            {demo.email}
                           </div>
                         </div>
                       </button>
@@ -279,170 +267,132 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'signin', onBa
                 </div>
               </div>
 
-              {/* Divider */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200" />
-                </div>
-                <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                  <span className="bg-white px-2.5">Credentials</span>
-                </div>
-              </div>
-
-              {/* Sign In Form */}
-              <form onSubmit={handleSignIn} className="space-y-3.5">
+              {/* Form */}
+              <form onSubmit={handleSignIn} className="space-y-3.5 pt-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">
+                  <label className="block text-xs font-medium text-text mb-1">
                     Work Email
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Mail className="w-3.5 h-3.5 text-text-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.5} />
                     <input
                       type="email"
                       required
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       placeholder="name@institute.org"
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-hidden focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-400"
+                      className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-border text-xs text-text bg-surface placeholder:text-text-subtle focus:border-accent"
                     />
                   </div>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                    <label className="text-xs font-medium text-text">
                       Password
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => showToast('Demo password is set to "password123"', 'info')}
-                      className="text-[11px] text-indigo-600 hover:text-indigo-700 font-medium cursor-pointer"
-                    >
-                      Forgot password?
-                    </button>
+                    <span className="text-[11px] text-text-subtle">
+                      Default: password123
+                    </span>
                   </div>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Lock className="w-3.5 h-3.5 text-text-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.5} />
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
                       value={password}
                       onChange={e => setPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-hidden focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-400"
+                      className="w-full pl-9 pr-9 py-2 rounded-[6px] border border-border text-xs text-text bg-surface placeholder:text-text-subtle focus:border-accent font-mono"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-subtle hover:text-text cursor-pointer"
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" strokeWidth={1.5} /> : <Eye className="w-3.5 h-3.5" strokeWidth={1.5} />}
                     </button>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between text-xs pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-text-muted">
                     <input
                       type="checkbox"
                       checked={rememberMe}
                       onChange={e => setRememberMe(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                      className="rounded-[3px] accent-accent"
                     />
-                    <span>Keep this workstation logged in</span>
+                    <span>Remember workstation</span>
                   </label>
                 </div>
 
-                <button
+                <Button
                   type="submit"
-                  disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] shadow-sm shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-50 mt-2"
+                  variant="primary"
+                  isLoading={isLoading}
+                  className="w-full mt-2"
+                  icon={<ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />}
                 >
-                  {isLoading ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Authenticating JWT Session...
-                    </span>
-                  ) : (
-                    <>
-                      Sign In to Operations Console
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
+                  Sign In
+                </Button>
               </form>
-
-              <div className="text-center pt-2 text-xs text-slate-500">
-                Don't have an operations account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setAuthMode('signup')}
-                  className="text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer underline"
-                >
-                  Register new account
-                </button>
-              </div>
             </div>
           )}
 
-          {/* ===============================================================
-              TAB 2: SIGN UP / CREATE ACCOUNT MODE (FOR ALL 4 ROLES)
-              =============================================================== */}
+          {/* TAB 2: SIGN UP */}
           {authMode === 'signup' && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                  Create Operations Account
+                <h2 className="font-serif text-xl sm:text-2xl font-medium tracking-tight text-text">
+                  Register Account
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Register a new staff profile under your designated institute role
+                <p className="text-xs text-text-muted mt-0.5">
+                  Create a staff account with designated operational role
                 </p>
               </div>
 
               <form onSubmit={handleSignUp} className="space-y-3.5">
-                {/* Full Name */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">
+                  <label className="block text-xs font-medium text-text mb-1">
                     Full Name
                   </label>
                   <div className="relative">
-                    <UserIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <UserIcon className="w-3.5 h-3.5 text-text-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.5} />
                     <input
                       type="text"
                       required
                       value={signupName}
                       onChange={e => setSignupName(e.target.value)}
-                      placeholder="e.g. Dr. K. Radhakrishnan"
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-hidden focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-400"
+                      placeholder="e.g. Anand Kumar"
+                      className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-border text-xs text-text bg-surface placeholder:text-text-subtle focus:border-accent"
                     />
                   </div>
                 </div>
 
-                {/* Work Email */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">
-                    Work / Institute Email
+                  <label className="block text-xs font-medium text-text mb-1">
+                    Work Email
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Mail className="w-3.5 h-3.5 text-text-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.5} />
                     <input
                       type="email"
                       required
                       value={signupEmail}
                       onChange={e => setSignupEmail(e.target.value)}
-                      placeholder="staff.member@institute.org"
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-hidden focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-400"
+                      placeholder="name@institute.org"
+                      className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-border text-xs text-text bg-surface placeholder:text-text-subtle focus:border-accent"
                     />
                   </div>
                 </div>
 
-                {/* Password */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">
-                    Create Password
+                  <label className="block text-xs font-medium text-text mb-1">
+                    Password
                   </label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Lock className="w-3.5 h-3.5 text-text-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.5} />
                     <input
                       type={showSignupPassword ? 'text' : 'password'}
                       required
@@ -450,49 +400,43 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'signin', onBa
                       value={signupPassword}
                       onChange={e => setSignupPassword(e.target.value)}
                       placeholder="Minimum 6 characters"
-                      className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-hidden focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-400"
+                      className="w-full pl-9 pr-9 py-2 rounded-[6px] border border-border text-xs text-text bg-surface placeholder:text-text-subtle focus:border-accent font-mono"
                     />
                     <button
                       type="button"
                       onClick={() => setShowSignupPassword(!showSignupPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-subtle hover:text-text cursor-pointer"
                     >
-                      {showSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showSignupPassword ? <EyeOff className="w-3.5 h-3.5" strokeWidth={1.5} /> : <Eye className="w-3.5 h-3.5" strokeWidth={1.5} />}
                     </button>
                   </div>
                 </div>
 
-                {/* Role Selector: 4 Roles */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1.5">
-                    Assign Institute Role
+                  <label className="block text-xs font-medium text-text mb-1.5">
+                    Select Staff Role
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {ROLES_LIST.map(r => {
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {ROLES_LIST.filter(r => r.role !== 'owner').map(r => {
                       const isSelected = signupRole === r.role;
                       const Icon = r.icon;
                       return (
                         <div
                           key={r.role}
                           onClick={() => setSignupRole(r.role)}
-                          className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                          className={`p-2.5 rounded-[6px] border text-left cursor-pointer transition-colors ${
                             isSelected
-                              ? 'bg-indigo-50/90 border-indigo-500 ring-1 ring-indigo-500'
-                              : 'bg-slate-50 hover:bg-slate-100/60 border-slate-200'
+                              ? 'bg-accent-subtle border-accent/40 text-accent-text'
+                              : 'bg-surface hover:bg-surface-subtle border-border text-text'
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-indigo-600' : 'text-slate-500'}`} />
-                              <span className={`text-xs font-bold ${isSelected ? 'text-indigo-950' : 'text-slate-800'}`}>
-                                {r.title}
-                              </span>
-                            </div>
-                            <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded border ${r.badgeColor}`}>
-                              {r.badge}
+                          <div className="flex items-center gap-1.5">
+                            <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+                            <span className="text-xs font-medium capitalize">
+                              {r.role}
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-500 mt-1 leading-tight line-clamp-2">
+                          <p className="text-[10px] text-text-muted mt-1 leading-tight line-clamp-2">
                             {r.subtitle}
                           </p>
                         </div>
@@ -501,70 +445,48 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialMode = 'signin', onBa
                   </div>
                 </div>
 
-                {/* Optional Specialization for Trainer */}
                 {signupRole === 'trainer' && (
-                  <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl space-y-1">
-                    <label className="block text-[11px] font-semibold text-emerald-950 uppercase">
-                      Teaching Specialization
+                  <div className="p-3 bg-surface-subtle border border-border rounded-[6px] space-y-1">
+                    <label className="block text-[11px] font-medium text-text">
+                      Teaching Subject / Track
                     </label>
                     <input
                       type="text"
                       value={signupSpecialization}
                       onChange={e => setSignupSpecialization(e.target.value)}
-                      placeholder="e.g. Java, Spring Boot, Microservices"
-                      className="w-full px-3 py-1.5 rounded-lg border border-emerald-200 text-xs bg-white text-slate-900 focus:outline-hidden focus:border-emerald-600"
+                      placeholder="e.g. Java, Python, Web Dev"
+                      className="w-full px-2.5 py-1.5 rounded-[4px] border border-border text-xs bg-surface text-text focus:border-accent"
                     />
                   </div>
                 )}
 
-                {/* Submit CTA */}
-                <button
+                <Button
                   type="submit"
-                  disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] shadow-sm shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-50 mt-3"
+                  variant="primary"
+                  isLoading={isLoading}
+                  className="w-full mt-3"
+                  icon={<ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />}
                 >
-                  {isLoading ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Creating Account & Provisioning Role...
-                    </span>
-                  ) : (
-                    <>
-                      Create Account & Enter Console
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
+                  Create Staff Account
+                </Button>
               </form>
-
-              <div className="text-center pt-1 text-xs text-slate-500">
-                Already have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setAuthMode('signin')}
-                  className="text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer underline"
-                >
-                  Sign in here
-                </button>
-              </div>
             </div>
           )}
 
           {/* Bottom Security Compliance Stamp */}
-          <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          <div className="mt-5 pt-3.5 border-t border-border flex items-center justify-between text-[11px] text-text-muted">
             <div className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>256-bit Decoded JWT Authorization</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-accent" strokeWidth={1.5} />
+              <span>Verified Role Claims</span>
             </div>
-            <span className="text-slate-400 font-mono">RBAC Verified</span>
+            <span className="text-text-subtle font-mono text-[10px]">Least Privilege Enforced</span>
           </div>
-
         </div>
       </div>
 
       {/* Footer */}
-      <div className="text-center text-xs text-slate-400 pt-4">
-        Protected by multi-tier schema guardrails and immutable audit logs.
+      <div className="text-center text-xs text-text-subtle pt-4">
+        Protected by PostgreSQL schema boundaries and immutable audit logs.
       </div>
     </div>
   );

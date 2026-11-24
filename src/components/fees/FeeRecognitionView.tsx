@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   CreditCard,
   CheckCircle2,
@@ -9,12 +9,12 @@ import {
   Check,
   FileText,
   Clock,
-  Sparkles,
   ArrowRight,
   Printer,
   ShieldCheck,
   QrCode,
   Download,
+  CheckCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -112,16 +112,16 @@ export const FeeRecognitionView: React.FC = () => {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text">
             Fee Recognition & UPI Reconciliation
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-text-muted mt-0.5">
             Automatic OCR & bank statement reconciliation against student installments with 95%+ confidence match.
           </p>
         </div>
 
         {/* OCR Upload Button */}
-        <label className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-2xs transition-colors cursor-pointer shrink-0">
+        <label className="flex items-center gap-2 px-3.5 py-2 rounded-[6px] bg-accent hover:bg-indigo-700 text-white font-medium text-xs  transition-colors cursor-pointer shrink-0">
           <Upload className={`w-3.5 h-3.5 ${isUploading ? 'animate-bounce' : ''}`} />
           <span>{isUploading ? 'Scanning Receipt...' : 'Upload UPI Receipt / OCR'}</span>
           <input
@@ -136,57 +136,57 @@ export const FeeRecognitionView: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+        <div className="bg-surface p-4 rounded-[6px] border border-border ">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Matched (Pending Settlement)
             </span>
-            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-              <Sparkles className="w-4 h-4" />
+            <div className="p-1.5 rounded-[6px] bg-blue-50 text-blue-600">
+              <CheckCircle className="w-4 h-4" strokeWidth={1.5} />
             </div>
           </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">{formatINR(totalMatched)}</div>
-          <div className="mt-0.5 text-xs text-slate-400">Ready for 1-click ledger credit</div>
+          <div className="mt-2 text-2xl font-bold text-text">{formatINR(totalMatched)}</div>
+          <div className="mt-0.5 text-xs text-text-subtle">Ready for 1-click ledger credit</div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+        <div className="bg-surface p-4 rounded-[6px] border border-border ">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Reconciled & Settled
             </span>
-            <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+            <div className="p-1.5 rounded-[6px] bg-emerald-50 text-emerald-600">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">{formatINR(totalReconciled)}</div>
-          <div className="mt-0.5 text-xs text-slate-400">Credited to student installment ledgers</div>
+          <div className="mt-2 text-2xl font-bold text-text">{formatINR(totalReconciled)}</div>
+          <div className="mt-0.5 text-xs text-text-subtle">Credited to student installment ledgers</div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+        <div className="bg-surface p-4 rounded-[6px] border border-border ">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Matching Precision
             </span>
-            <div className="p-1.5 rounded-lg bg-purple-50 text-purple-600">
+            <div className="p-1.5 rounded-[6px] bg-purple-50 text-purple-600">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">97.4%</div>
-          <div className="mt-0.5 text-xs text-slate-400">Payer name + UTR + exact installment match</div>
+          <div className="mt-2 text-2xl font-bold text-text">97.4%</div>
+          <div className="mt-0.5 text-xs text-text-subtle">Payer name + UTR + exact installment match</div>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/60">
+      <div className="bg-surface p-3 rounded-[6px] border border-border  flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-1 bg-surface-muted p-0.5 rounded-[6px] border border-border/60">
           {(['all', 'matched', 'reconciled', 'unmatched'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setStatusFilter(tab)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-[6px] text-xs font-medium capitalize transition-all cursor-pointer ${
                 statusFilter === tab
-                  ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-surface text-text  font-semibold'
+                  : 'text-text-muted hover:text-text'
               }`}
             >
               {tab}
@@ -195,32 +195,32 @@ export const FeeRecognitionView: React.FC = () => {
         </div>
 
         <div className="relative w-full sm:w-72">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+          <Search className="w-3.5 h-3.5 text-text-subtle absolute left-3 top-2.5" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search UTR, payer, or student..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-hidden focus:border-indigo-500"
+            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-[6px] border border-border focus:outline-hidden focus:border-indigo-500"
           />
         </div>
       </div>
 
       {/* Reconciliation Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+      <div className="bg-surface rounded-[6px] border border-border  overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-400 text-sm">
+          <div className="p-12 text-center text-text-subtle text-sm">
             <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
             Loading payment feeds...
           </div>
         ) : filteredRecords.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 text-sm">
+          <div className="p-12 text-center text-text-muted text-sm">
             No reconciliation records found for the selected filter.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-[11px]">
+              <thead className="bg-surface-subtle border-b border-border text-text-muted font-semibold text-[11px]">
                 <tr>
                   <th className="py-2.5 px-3.5">Payment / UTR</th>
                   <th className="py-2.5 px-3.5">Payer & Mode</th>
@@ -233,43 +233,43 @@ export const FeeRecognitionView: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredRecords.map(rec => (
-                  <tr key={rec.id} className="hover:bg-slate-50/70 transition-colors">
+                  <tr key={rec.id} className="hover:bg-surface-subtle/70 transition-colors">
                     <td className="py-2.5 px-3.5">
-                      <div className="font-mono font-semibold text-slate-900">{rec.utr_number}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">{rec.bank_reference}</div>
+                      <div className="font-mono font-semibold text-text">{rec.utr_number}</div>
+                      <div className="text-[11px] text-text-subtle font-mono">{rec.bank_reference}</div>
                     </td>
 
                     <td className="py-2.5 px-3.5">
-                      <div className="font-medium text-slate-800">{rec.payer_name}</div>
-                      <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                      <div className="font-medium text-text">{rec.payer_name}</div>
+                      <div className="text-[11px] text-text-subtle flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         {new Date(rec.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </td>
 
-                    <td className="py-2.5 px-3.5 font-bold text-slate-900">
+                    <td className="py-2.5 px-3.5 font-bold text-text">
                       {formatINR(rec.amount)}
                     </td>
 
                     <td className="py-2.5 px-3.5">
                       {rec.matched_student_name ? (
                         <div>
-                          <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+                          <div className="font-semibold text-text flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                             {rec.matched_student_name}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            ID: {rec.matched_student_id} · EMI #{rec.matched_emi_id?.slice(-1) || '1'}
+                          <div className="text-[10px] text-text-subtle font-mono">
+                            ID: {rec.matched_student_id} ┬╖ EMI #{rec.matched_emi_id?.slice(-1) || '1'}
                           </div>
                         </div>
                       ) : (
-                        <span className="text-slate-400 italic">No exact student found</span>
+                        <span className="text-text-subtle italic">No exact student found</span>
                       )}
                     </td>
 
                     <td className="py-2.5 px-3.5">
                       <div className="flex items-center gap-1.5">
-                        <div className="w-12 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div className="w-12 bg-surface-muted rounded-full h-1.5 overflow-hidden">
                           <div
                             className={`h-full ${
                               rec.confidence_score >= 90
@@ -281,7 +281,7 @@ export const FeeRecognitionView: React.FC = () => {
                             style={{ width: `${rec.confidence_score}%` }}
                           />
                         </div>
-                        <span className="font-mono font-semibold text-[11px] text-slate-700">
+                        <span className="font-mono font-semibold text-[11px] text-text-muted">
                           {rec.confidence_score}%
                         </span>
                       </div>
@@ -307,7 +307,7 @@ export const FeeRecognitionView: React.FC = () => {
                       {rec.status === 'matched' && (
                         <button
                           onClick={() => handleReconcile(rec.id)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors cursor-pointer"
                         >
                           <Check className="w-3.5 h-3.5" />
                           Reconcile & Settle
@@ -317,9 +317,9 @@ export const FeeRecognitionView: React.FC = () => {
                       {rec.status === 'reconciled' && (
                         <button
                           onClick={() => setSelectedReceipt(rec)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] border border-border bg-surface hover:bg-surface-subtle text-text-muted text-xs font-medium transition-colors cursor-pointer"
                         >
-                          <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                          <FileText className="w-3.5 h-3.5 text-accent" />
                           View Receipt
                         </button>
                       )}
@@ -341,17 +341,17 @@ export const FeeRecognitionView: React.FC = () => {
           description="Generated by Institute Operations Accounts Desk"
           maxWidth="lg"
         >
-          <div className="p-5 bg-white border border-slate-200 rounded-xl space-y-4 text-slate-800">
+          <div className="p-5 bg-surface border border-border rounded-[6px] space-y-4 text-text">
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-start justify-between border-b border-border pb-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-md bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
+                  <div className="w-7 h-7 rounded-[6px] bg-accent flex items-center justify-center text-white font-bold text-xs">
                     I
                   </div>
-                  <span className="font-semibold text-sm text-slate-900">Institute Operations Desk</span>
+                  <span className="font-semibold text-sm text-text">Institute Operations Desk</span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-0.5">
+                <p className="text-[11px] text-text-muted mt-0.5">
                   Automated UPI Reconciliation Ledger
                 </p>
               </div>
@@ -360,7 +360,7 @@ export const FeeRecognitionView: React.FC = () => {
                 <span className="text-[10px] font-mono uppercase bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200 font-bold">
                   PAID & VERIFIED
                 </span>
-                <div className="text-[11px] font-mono text-slate-400 mt-1">
+                <div className="text-[11px] font-mono text-text-subtle mt-1">
                   Receipt: REC-2026-{selectedReceipt.id.slice(-4)}
                 </div>
               </div>
@@ -369,37 +369,37 @@ export const FeeRecognitionView: React.FC = () => {
             {/* Receipt Details Grid */}
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <span className="text-slate-400 block text-[10px] font-semibold uppercase">Student Name</span>
-                <span className="font-semibold text-slate-900 text-sm">{selectedReceipt.matched_student_name}</span>
-                <span className="text-slate-500 block font-mono text-[11px]">ID: {selectedReceipt.matched_student_id}</span>
+                <span className="text-text-subtle block text-[10px] font-semibold uppercase">Student Name</span>
+                <span className="font-semibold text-text text-sm">{selectedReceipt.matched_student_name}</span>
+                <span className="text-text-muted block font-mono text-[11px]">ID: {selectedReceipt.matched_student_id}</span>
               </div>
 
               <div>
-                <span className="text-slate-400 block text-[10px] font-semibold uppercase">Amount Received</span>
+                <span className="text-text-subtle block text-[10px] font-semibold uppercase">Amount Received</span>
                 <span className="font-bold text-emerald-700 text-base">{formatINR(selectedReceipt.amount)}</span>
-                <span className="text-slate-500 block text-[11px]">Mode: {selectedReceipt.payment_mode}</span>
+                <span className="text-text-muted block text-[11px]">Mode: {selectedReceipt.payment_mode}</span>
               </div>
 
               <div>
-                <span className="text-slate-400 block text-[10px] font-semibold uppercase">UTR / Txn Ref</span>
-                <span className="font-mono font-medium text-slate-800 break-all text-[11px]">{selectedReceipt.utr_number}</span>
+                <span className="text-text-subtle block text-[10px] font-semibold uppercase">UTR / Txn Ref</span>
+                <span className="font-mono font-medium text-text break-all text-[11px]">{selectedReceipt.utr_number}</span>
               </div>
 
               <div>
-                <span className="text-slate-400 block text-[10px] font-semibold uppercase">Payment Date</span>
-                <span className="font-medium text-slate-800 text-[11px]">{new Date(selectedReceipt.timestamp).toLocaleDateString()}</span>
+                <span className="text-text-subtle block text-[10px] font-semibold uppercase">Payment Date</span>
+                <span className="font-medium text-text text-[11px]">{new Date(selectedReceipt.timestamp).toLocaleDateString()}</span>
               </div>
             </div>
 
             {/* Verification Footer */}
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <div className="pt-3 border-t border-border flex items-center justify-between text-xs text-text-muted">
               <div className="flex items-center gap-1.5 text-[11px]">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Audited by Accounts Desk</span>
               </div>
               <button
                 onClick={() => window.print()}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-md border border-slate-200 hover:bg-slate-50 font-medium text-slate-700 text-xs cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-[6px] border border-border hover:bg-surface-subtle font-medium text-text-muted text-xs cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />
                 Print Receipt
@@ -411,3 +411,7 @@ export const FeeRecognitionView: React.FC = () => {
     </div>
   );
 };
+
+
+
+

@@ -1,16 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  CheckCircle2,
   Building,
-  Video,
-  Clock,
+  Laptop,
   Search,
   Plus,
-  MapPin,
-  Laptop,
-  Calendar,
-  UserCheck,
-  ShieldCheck,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -18,7 +13,11 @@ import { api } from '../../lib/api';
 import { formatDateTime } from '../../lib/utils';
 import { AttendanceRecord, Batch, Student } from '../../types';
 import { Badge, BadgeVariant } from '../common/Badge';
+import { PageHeader } from '../common/PageHeader';
+import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
+import { Skeleton } from '../common/Skeleton';
+import { EmptyState } from '../common/EmptyState';
 
 export const AttendanceView: React.FC = () => {
   const { role } = useAuth();
@@ -28,53 +27,60 @@ export const AttendanceView: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [viewType, setViewType] = useState<'classroom' | 'online'>('classroom');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Modal State
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [checkInStatus, setCheckInStatus] = useState<'present' | 'late'>('present');
 
-  const loadAttendance = async () => {
+  const loadAttendance = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const [recs, stdList, batchList] = await Promise.all([
         api.getAttendanceRecords(viewType),
         api.getStudents(),
         api.getBatches(),
       ]);
-      setRecords(recs);
-      setStudents(stdList);
-      setBatches(batchList);
-      if (stdList.length && batchList.length) {
+      setRecords(recs || []);
+      setStudents(stdList || []);
+      setBatches(batchList || []);
+      if (stdList?.length && batchList?.length) {
         setSelectedStudentId(stdList[0].id);
         setSelectedBatchId(batchList[0].id);
       }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to fetch attendance logs', 'error');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to fetch attendance logs';
+      setError(msg);
+      showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [viewType, showToast]);
 
   useEffect(() => {
     loadAttendance();
-  }, [viewType]);
+  }, [loadAttendance]);
 
   const filteredRecords = useMemo(() => {
     return records.filter(r => {
+      const q = searchQuery.toLowerCase();
       const matchSearch =
-        r.student_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.batch_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.ip_or_location && r.ip_or_location.toLowerCase().includes(searchQuery.toLowerCase()));
+        r.student_name.toLowerCase().includes(q) ||
+        r.batch_name.toLowerCase().includes(q) ||
+        (r.ip_or_location && r.ip_or_location.toLowerCase().includes(q));
       return matchSearch;
     });
   }, [records, searchQuery]);
 
   const handleManualCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       if (viewType === 'classroom') {
         await api.checkInClassroom({
@@ -82,19 +88,22 @@ export const AttendanceView: React.FC = () => {
           batch_id: selectedBatchId,
           status: checkInStatus,
         });
-        showToast('Classroom check-in verified via biometric kiosk', 'success');
+        showToast('Classroom check-in recorded', 'success');
       } else {
         await api.recordOnlineJoin({
           student_id: selectedStudentId,
           batch_id: selectedBatchId,
           duration_minutes: 105,
         });
-        showToast('Online session join packet recorded via WebRTC bridge', 'success');
+        showToast('Online attendance session recorded', 'success');
       }
       setIsCheckInModalOpen(false);
       loadAttendance();
-    } catch (err: any) {
-      showToast(err.message || 'Check-in failed', 'error');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Check-in failed';
+      showToast(msg, 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -106,135 +115,202 @@ export const AttendanceView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-            Attendance & Join Verification
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Real-time biometric terminal telemetry vs WebRTC classroom join logs.
-          </p>
+      <PageHeader
+        title="Attendance"
+        description="Daily session attendance logs across classroom and online batches."
+        badge={<Badge variant="neutral" dot>{filteredRecords.length} Records</Badge>}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={loadAttendance}
+              icon={<RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />}
+            >
+              Refresh
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsCheckInModalOpen(true)}
+              icon={<Plus className="w-3.5 h-3.5" strokeWidth={1.5} />}
+            >
+              Record check-in
+            </Button>
+          </div>
+        }
+      />
+
+      {/* Error State with Retry Button */}
+      {error && (
+        <div className="p-4 rounded-[6px] border border-status-red/30 bg-status-red-bg text-status-red flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+            <span>{error}</span>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={loadAttendance}
+            icon={<RefreshCw className="w-3 h-3" strokeWidth={1.5} />}
+          >
+            Retry
+          </Button>
         </div>
+      )}
 
-        <button
-          onClick={() => setIsCheckInModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 shadow-xs transition-colors shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          {viewType === 'classroom' ? 'Biometric Check-in' : 'Record Online Join'}
-        </button>
-      </div>
-
-      {/* View Toggle & Search */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
-        {/* VIEW TOGGLE */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200 w-full sm:w-auto">
+      {/* Controls Bar: Mode tabs + search */}
+      <div className="bg-surface p-3 sm:p-3.5 rounded-[8px] border border-border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-1 bg-surface-subtle p-0.5 rounded-[6px] border border-border">
           <button
             onClick={() => setViewType('classroom')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex-1 sm:flex-initial px-3 py-1.5 sm:py-1 rounded-[4px] text-xs font-medium transition-colors cursor-pointer min-h-[38px] sm:min-h-0 flex items-center justify-center gap-1.5 ${
               viewType === 'classroom'
-                ? 'bg-white text-indigo-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-surface text-text border border-border shadow-xs'
+                : 'text-text-muted hover:text-text'
             }`}
           >
-            <Building className="w-4 h-4" />
-            Classroom Check-ins
+            <Building className="w-3.5 h-3.5" strokeWidth={1.5} />
+            Classroom
           </button>
-
           <button
             onClick={() => setViewType('online')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex-1 sm:flex-initial px-3 py-1.5 sm:py-1 rounded-[4px] text-xs font-medium transition-colors cursor-pointer min-h-[38px] sm:min-h-0 flex items-center justify-center gap-1.5 ${
               viewType === 'online'
-                ? 'bg-white text-indigo-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-surface text-text border border-border shadow-xs'
+                : 'text-text-muted hover:text-text'
             }`}
           >
-            <Video className="w-4 h-4" />
-            Online Join Logs
+            <Laptop className="w-3.5 h-3.5" strokeWidth={1.5} />
+            Online
           </button>
         </div>
 
-        <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+        <div className="relative w-full sm:w-72">
+          <Search className="w-3.5 h-3.5 text-text-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.5} />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search candidate, cohort, IP/location..."
-            className="w-full pl-10 pr-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:border-indigo-500"
+            placeholder="Search student, batch..."
+            className="w-full pl-9 pr-3 py-2 sm:py-1.5 text-xs rounded-[6px] border border-border bg-surface text-text focus:border-accent"
           />
         </div>
       </div>
 
       {/* Attendance Log Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+      <div className="bg-surface rounded-[8px] border border-border overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-400 text-sm">
-            <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-            Loading attendance logs...
+          <div className="p-4 space-y-3">
+            <Skeleton variant="text" className="h-10" />
+            <Skeleton variant="text" className="h-10" />
+            <Skeleton variant="text" className="h-10" />
           </div>
         ) : filteredRecords.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 text-sm">
-            No {viewType} attendance records found.
+          <div className="p-8">
+            <EmptyState
+              title="No attendance records found"
+              description={`No ${viewType} attendance entries match your current search.`}
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setIsCheckInModalOpen(true)}
+                  icon={<Plus className="w-3.5 h-3.5" strokeWidth={1.5} />}
+                >
+                  Record check-in
+                </Button>
+              }
+            />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 uppercase tracking-wider text-[11px]">
-                <tr>
-                  <th className="py-3 px-4 font-semibold">Student</th>
-                  <th className="py-3 px-4 font-semibold">Cohort Batch</th>
-                  <th className="py-3 px-4 font-semibold">Verification Channel</th>
-                  <th className="py-3 px-4 font-semibold">Location / Node IP</th>
-                  <th className="py-3 px-4 font-semibold">Timestamp</th>
-                  <th className="py-3 px-4 font-semibold">Session Duration</th>
-                  <th className="py-3 px-4 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredRecords.map(rec => (
-                  <tr key={rec.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-900">{rec.student_name}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">{rec.student_id}</div>
-                    </td>
+          <>
+            {/* 1. MOBILE VIEW (< 640px): Stacked Cards */}
+            <div className="sm:hidden divide-y divide-border">
+              {filteredRecords.map(rec => (
+                <div key={rec.id} className="p-3.5 space-y-2 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-text text-sm">{rec.student_name}</div>
+                      <div className="text-[11px] text-text-muted mt-0.5">{rec.batch_name}</div>
+                    </div>
+                    {getStatusBadge(rec.status)}
+                  </div>
 
-                    <td className="py-3 px-4 text-slate-700 font-medium">
-                      {rec.batch_name}
-                    </td>
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-border/50">
+                    <div>
+                      <span className="text-[10px] text-text-subtle uppercase">Verified by: </span>
+                      <span className="text-text-muted">{rec.verified_by || 'Terminal'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-text-subtle uppercase">Time: </span>
+                      <span className="text-text-muted tabular-nums">{formatDateTime(rec.timestamp)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                        {rec.type === 'classroom' ? (
-                          <Building className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <Laptop className="w-3.5 h-3.5 text-cyan-600" />
-                        )}
-                        <span>{rec.verified_by || 'Station Terminal'}</span>
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
-                      {rec.ip_or_location || 'Campus Gate'}
-                    </td>
-
-                    <td className="py-3 px-4 text-slate-600">
-                      {formatDateTime(rec.timestamp)}
-                    </td>
-
-                    <td className="py-3 px-4 font-medium text-slate-700">
-                      {rec.duration_minutes ? `${rec.duration_minutes} mins` : 'Full Session'}
-                    </td>
-
-                    <td className="py-3 px-4">
-                      {getStatusBadge(rec.status)}
-                    </td>
+            {/* 2. TABLET & DESKTOP (>= 640px): Horizontal scroll with sticky first column */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs tabular-nums">
+                <thead className="bg-surface-subtle/80 border-b border-border text-text-muted uppercase tracking-wider text-[11px]">
+                  <tr>
+                    <th className="py-2.5 px-3.5 font-medium sticky left-0 bg-surface-subtle z-10 border-r border-border">
+                      Student Name
+                    </th>
+                    <th className="py-2.5 px-3.5 font-medium">Cohort Batch</th>
+                    <th className="py-2.5 px-3.5 font-medium">Channel</th>
+                    <th className="py-2.5 px-3.5 font-medium">Location / IP</th>
+                    <th className="py-2.5 px-3.5 font-medium">Timestamp</th>
+                    <th className="py-2.5 px-3.5 font-medium">Duration</th>
+                    <th className="py-2.5 px-3.5 font-medium">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredRecords.map(rec => (
+                    <tr key={rec.id} className="hover:bg-surface-subtle/50 transition-colors text-text">
+                      <td className="py-2.5 px-3.5 sticky left-0 bg-surface z-10 border-r border-border">
+                        <div className="font-medium text-text">{rec.student_name}</div>
+                        <div className="text-[10px] text-text-subtle font-mono">{rec.student_id}</div>
+                      </td>
+
+                      <td className="py-2.5 px-3.5 text-text-muted">
+                        {rec.batch_name}
+                      </td>
+
+                      <td className="py-2.5 px-3.5">
+                        <div className="flex items-center gap-1.5 text-text-muted">
+                          {rec.type === 'classroom' ? (
+                            <Building className="w-3.5 h-3.5 text-status-green" strokeWidth={1.5} />
+                          ) : (
+                            <Laptop className="w-3.5 h-3.5 text-accent" strokeWidth={1.5} />
+                          )}
+                          <span>{rec.verified_by || 'Terminal'}</span>
+                        </div>
+                      </td>
+
+                      <td className="py-2.5 px-3.5 text-text-muted font-mono text-[11px]">
+                        {rec.ip_or_location || 'Campus'}
+                      </td>
+
+                      <td className="py-2.5 px-3.5 text-text-muted">
+                        {formatDateTime(rec.timestamp)}
+                      </td>
+
+                      <td className="py-2.5 px-3.5 text-text-muted">
+                        {rec.duration_minutes ? `${rec.duration_minutes} mins` : '120 mins'}
+                      </td>
+
+                      <td className="py-2.5 px-3.5">
+                        {getStatusBadge(rec.status)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -242,18 +318,18 @@ export const AttendanceView: React.FC = () => {
       <Modal
         isOpen={isCheckInModalOpen}
         onClose={() => setIsCheckInModalOpen(false)}
-        title={viewType === 'classroom' ? 'Classroom Biometric Check-In' : 'Simulate Online Join'}
-        description="Record session attendance for a student directly"
+        title={viewType === 'classroom' ? 'Record classroom check-in' : 'Record online attendance'}
+        description="Verify and log attendance for a student session."
       >
-        <form onSubmit={handleManualCheckIn} className="space-y-4 text-xs">
+        <form onSubmit={handleManualCheckIn} className="space-y-3.5 text-xs">
           <div>
-            <label className="block font-semibold text-slate-700 uppercase mb-1">Student</label>
+            <label className="block font-medium text-text mb-1">Student</label>
             <select
               value={selectedStudentId}
               onChange={e => setSelectedStudentId(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-hidden focus:border-indigo-500"
+              className="w-full px-2.5 py-1.5 rounded-[6px] border border-border bg-surface text-text focus:border-accent"
             >
-              {students.slice(0, 30).map(s => (
+              {students.slice(0, 40).map(s => (
                 <option key={s.id} value={s.id}>
                   {s.name} ({s.batch_name})
                 </option>
@@ -262,11 +338,11 @@ export const AttendanceView: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 uppercase mb-1">Cohort Batch</label>
+            <label className="block font-medium text-text mb-1">Cohort batch</label>
             <select
               value={selectedBatchId}
               onChange={e => setSelectedBatchId(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-hidden focus:border-indigo-500"
+              className="w-full px-2.5 py-1.5 rounded-[6px] border border-border bg-surface text-text focus:border-accent"
             >
               {batches.map(b => (
                 <option key={b.id} value={b.id}>
@@ -278,11 +354,11 @@ export const AttendanceView: React.FC = () => {
 
           {viewType === 'classroom' && (
             <div>
-              <label className="block font-semibold text-slate-700 uppercase mb-1">Arrival Status</label>
+              <label className="block font-medium text-text mb-1">Status</label>
               <select
                 value={checkInStatus}
-                onChange={e => setCheckInStatus(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-hidden focus:border-indigo-500"
+                onChange={e => setCheckInStatus(e.target.value as 'present' | 'late')}
+                className="w-full px-2.5 py-1.5 rounded-[6px] border border-border bg-surface text-text focus:border-accent"
               >
                 <option value="present">Present (On Time)</option>
                 <option value="late">Late Arrival</option>
@@ -290,20 +366,23 @@ export const AttendanceView: React.FC = () => {
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-            <button
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => setIsCheckInModalOpen(false)}
-              className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700"
+              variant="primary"
+              size="sm"
+              isLoading={isSubmitting}
             >
-              Confirm Log
-            </button>
+              Record check-in
+            </Button>
           </div>
         </form>
       </Modal>

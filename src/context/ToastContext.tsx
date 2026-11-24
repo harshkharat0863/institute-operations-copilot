@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { CheckCircle2, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 
 export interface Toast {
   id: string;
@@ -36,32 +37,47 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ toasts, showToast, removeToast }}>
       {children}
       {/* Toast viewport */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-md pointer-events-none">
-        {toasts.map(toast => (
-          <div
-            key={toast.id}
-            className={`pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-lg border text-sm transition-all transform animate-in slide-in-from-bottom-2 ${
-              toast.type === 'success'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                : toast.type === 'error'
-                ? 'bg-rose-50 border-rose-200 text-rose-900'
-                : toast.type === 'warning'
-                ? 'bg-amber-50 border-amber-200 text-amber-900'
-                : 'bg-white border-slate-200 text-slate-800'
-            }`}
-          >
-            <div className="flex-1">
-              {toast.title && <div className="font-semibold mb-0.5">{toast.title}</div>}
-              <div>{toast.message}</div>
-            </div>
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="text-slate-400 hover:text-slate-600 font-bold px-1"
+      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none w-full px-4 sm:px-0">
+        {toasts.map(toast => {
+          const Icon =
+            toast.type === 'success'
+              ? CheckCircle2
+              : toast.type === 'error'
+              ? AlertCircle
+              : toast.type === 'warning'
+              ? AlertTriangle
+              : Info;
+
+          const typeStyles =
+            toast.type === 'success'
+              ? 'bg-status-green-bg border-status-green/30 text-status-green'
+              : toast.type === 'error'
+              ? 'bg-status-red-bg border-status-red/30 text-status-red'
+              : toast.type === 'warning'
+              ? 'bg-status-amber-bg border-status-amber/30 text-status-amber'
+              : 'bg-surface border-border text-text';
+
+          return (
+            <div
+              key={toast.id}
+              className={`toast-panel pointer-events-auto flex items-start gap-2.5 p-3 rounded-[6px] shadow-lg border text-xs ${typeStyles}`}
             >
-              ×
-            </button>
-          </div>
-        ))}
+              <Icon className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
+              <div className="flex-1 min-w-0">
+                {toast.title && <div className="font-semibold mb-0.5 text-text">{toast.title}</div>}
+                <div className="text-text leading-relaxed">{toast.message}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeToast(toast.id)}
+                className="text-text-subtle hover:text-text p-0.5 rounded cursor-pointer transition-colors"
+                aria-label="Close notification"
+              >
+                <X className="w-3.5 h-3.5" strokeWidth={1.5} />
+              </button>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );
