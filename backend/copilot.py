@@ -36,7 +36,7 @@ ROLE_ALLOWED_TABLES: Dict[str, Set[str]] = {
     },
     "counselor": {
         "student_attendance_30d", "batch_summary", "students", "batches", "courses", "trainers",
-        "rooms", "attendance_records", "action_items", "timetable_sessions", "certificates"
+        "rooms", "attendance_records", "action_items", "timetable_sessions", "certificates", "emi_due_this_week"
     },
     "trainer": {
         "trainer_safe_students", "batch_summary", "courses", "trainers", "rooms", "timetable_sessions", "class_recordings", "batches"
@@ -84,14 +84,17 @@ Available Tables & Analytical Views:
     "counselor": """
 Available Tables & Analytical Views:
 - student_attendance_30d (student_id, student_name, batch_id, total_sessions_30d, attended_sessions_30d, missed_classes_last_30d, attendance_rate_30d, attendance_rate)
+- emi_due_this_week (emi_id, student_id, student_name, phone, batch_name, amount, installment_no, total_installments, due_date, status, days_overdue)
 - batch_summary (id, name, course_id, course_name, trainer_id, trainer_name, room_id, room_name, mode, max_capacity, start_date, schedule, status, enrolled_count, active_students_count, seats_remaining, batch_attendance_rate)
 - students (id, name, email, phone, batch_id, enrollment_date, status)
 - batches (id, name, course_id, trainer_id, room_id, mode, max_capacity, start_date, schedule, status)
 - courses (id, name, code, duration_weeks, fee, category)
 - trainers (id, name, email, specialization, max_hours_per_week, status)
+- rooms (id, name, capacity)
 - attendance_records (id, student_id, batch_id, session_date, status, mode, duration_minutes)
 - timetable_sessions (id, batch_id, trainer_id, room_id, weekday, start_time, end_time, mode, color_code)
-NOTE: You do NOT have access to payments, salary, or financial ledgers.
+- certificates (id, student_id, course_id, issue_date, certificate_number, status)
+NOTE: You have access to emi_due_this_week for fee counselling. You do NOT have access to payments, emis, payment_reconciliations, student_fee_summary, or staff salary.
 """,
     "trainer": """
 Available Tables & Analytical Views:
@@ -119,6 +122,137 @@ NOTE: Detailed class recordings and technical logs are restricted.
 # -------------------------------------------------------------
 # 2. SQLGLOT AST VALIDATOR (Item 2)
 # -------------------------------------------------------------
+def strip_ansi(text: str) -> str:
+    """Strips ANSI escape codes (e.g. \x1b[4m, [4m, \x1b[0m, [0m) from text."""
+    clean = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", text)
+    clean = re.sub(r"\[[0-9]+m", "", clean)
+    return clean.strip()
+
+
+# -------------------------------------------------------------
+# 2.1 SAVED QUERY FALLBACK DICTIONARY (Requirement 4)
+# -------------------------------------------------------------
+SAVED_QUERIES: Dict[str, Dict[str, Any]] = {
+    "benchmark_java_attendance_emi": {
+        "description": "Java batch students with 3+ missed classes and an EMI due this week",
+        "sql": (
+            "SELECT att.student_name, e.batch_name, e.phone, att.missed_classes_last_30d, "
+            "e.amount AS emi_amount, e.due_date, att.attendance_rate "
+            "FROM student_attendance_30d att "
+            "JOIN emi_due_this_week e ON att.student_id = e.student_id "
+            "WHERE e.batch_name ILIKE '%Java%' AND att.missed_classes_last_30d >= 3 "
+            "LIMIT 200"
+        ),
+        "patterns": [
+            r"java.*missed.*(3|three).*emi",
+            r"java.*batch.*(missed|absent).*due.*week",
+            r"students.*java.*(missed|attendance).*emi.*due",
+            r"which students in the java batch have missed three or more classes and have an emi due this week",
+        ],
+    },
+    "emis_due_this_week": {
+        "description": "EMIs due this week",
+        "sql": (
+            "SELECT student_name, batch_name, phone, amount, installment_no, "
+            "total_installments, due_date, status, days_overdue "
+            "FROM emi_due_this_week "
+            "WHERE due_date BETWEEN ((now() AT TIME ZONE 'Asia/Kolkata')::date) "
+            "AND (((now() AT TIME ZONE 'Asia/Kolkata')::date) + 7) "
+            "LIMIT 200"
+        ),
+        "patterns": [
+            r"^emis?\s+due(\s+this\s+week)?$",
+            r"upcoming\s+emis?",
+            r"emis?\s+due\s+this\s+week",
+            r"fees?\s+due\s+this\s+week",
+            r"instal+ments?\s+due\s+this\s+week",
+        ],
+    },
+    "overdue_instalments_java": {
+        "description": "Overdue instalments for the Java batch",
+        "sql": (
+            "SELECT student_name, batch_name, phone, amount, installment_no, "
+            "total_installments, due_date, days_overdue "
+            "FROM emi_due_this_week "
+            "WHERE batch_name ILIKE '%Java%' AND (days_overdue > 0 OR status ILIKE '%overdue%') "
+            "LIMIT 200"
+        ),
+        "patterns": [
+            r"overdue\s+(instal+ments?|emis?)\s+for\s+(the\s+)?java\s+batch",
+            r"java\s+batch\s+overdue\s+(instal+ments?|emis?)",
+            r"overdue.*java",
+        ],
+    },
+    "students_missed_two_consecutive_payments": {
+        "description": "Students who missed two consecutive payments",
+        "sql": (
+            "SELECT student_name, batch_name, phone, student_status, overdue_emis_count, total_overdue_amount "
+            "FROM student_fee_summary "
+            "WHERE overdue_emis_count >= 2 "
+            "LIMIT 200"
+        ),
+        "patterns": [
+            r"students?\s+(who\s+)?missed\s+(two|2)\s+(consecutive\s+)?payments?",
+            r"students?\s+with\s+(two|2)\s+overdue\s+(payments?|emis?)",
+            r"missed\s+(two|2)\s+consecutive\s+payments?",
+            r"missed\s+two\s+payments",
+        ],
+    },
+    "students_falling_behind_low_attendance": {
+        "description": "Students falling behind with low attendance",
+        "sql": (
+            "SELECT student_name, attendance_rate, missed_classes_last_30d, "
+            "total_sessions_30d, attended_sessions_30d "
+            "FROM student_attendance_30d "
+            "WHERE attendance_rate < 75.0 OR missed_classes_last_30d >= 3 "
+            "ORDER BY attendance_rate ASC "
+            "LIMIT 200"
+        ),
+        "patterns": [
+            r"students?\s+falling\s+behind(\s+with\s+low\s+attendance)?",
+            r"students?\s+with\s+low\s+attendance",
+            r"low\s+attendance\s+students?",
+            r"attendance\s+(below|less\s+than)\s+75",
+            r"falling\s+behind.*attendance",
+        ],
+    },
+    "todays_timetable": {
+        "description": "Today's timetable",
+        "sql": (
+            "SELECT t.id, b.name AS batch_name, tr.name AS trainer_name, r.name AS room_name, "
+            "t.weekday, t.start_time, t.end_time, t.mode "
+            "FROM timetable_sessions t "
+            "JOIN batches b ON t.batch_id = b.id "
+            "JOIN trainers tr ON t.trainer_id = tr.id "
+            "JOIN rooms r ON t.room_id = r.id "
+            "WHERE t.weekday = TRIM(TO_CHAR((now() AT TIME ZONE 'Asia/Kolkata')::date, 'Day')) "
+            "ORDER BY t.start_time ASC "
+            "LIMIT 200"
+        ),
+        "patterns": [
+            r"today'?s?\s+timetable",
+            r"timetable\s+for\s+today",
+            r"classes\s+today",
+            r"sessions\s+today",
+            r"schedule\s+for\s+today",
+        ],
+    },
+}
+
+
+def find_saved_query(question: str) -> Optional[str]:
+    """Match natural language question to one of the 6 verified saved queries."""
+    q_clean = strip_ansi(question).lower().strip()
+    q_norm = re.sub(r"[^\w\s]", " ", q_clean)
+    q_norm = re.sub(r"\s+", " ", q_norm).strip()
+
+    for item in SAVED_QUERIES.values():
+        for pat in item["patterns"]:
+            if re.search(pat, q_norm, re.IGNORECASE) or re.search(pat, q_clean, re.IGNORECASE):
+                return item["sql"]
+    return None
+
+
 class SecurityViolation(Exception):
     def __init__(self, message: str, layer: str = "ast validator"):
         super().__init__(message)
@@ -136,7 +270,7 @@ def validate_and_format_sql(sql_query: str, role: str) -> str:
     5. Checks against blocked columns
     6. Enforces LIMIT <= 200
     """
-    clean = sql_query.strip()
+    clean = strip_ansi(sql_query).strip()
     # Strip markdown code blocks if present
     if clean.startswith("```"):
         clean = re.sub(r"^```(?:sql)?", "", clean, flags=re.IGNORECASE).strip()
@@ -439,39 +573,82 @@ async def process_copilot_ask(question: str, role: str) -> Dict[str, Any]:
         f"RULES:\n"
         f"1. Output ONLY the raw SQL SELECT query. Do NOT include markdown code fences (```), commentary, or explanations.\n"
         f"2. Use ILIKE for string filters (e.g. batch_name ILIKE '%Java%').\n"
-        f"3. Use CURRENT_DATE for date relative offsets (e.g. due_date BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE + INTERVAL '7 days').\n"
-        f"4. If asking for students with attendance problems and dues, JOIN student_fee_summary with student_attendance_30d and/or emi_due_this_week.\n"
-        f"5. Always append LIMIT 200."
+        f"3. DATE RULES (mandatory):\n"
+        f"   a. timetable_sessions.weekday is stored as plain text like 'Monday', 'Thursday' (no trailing spaces).\n"
+        f"      Always compare it with: TRIM(TO_CHAR(<date_expr>, 'Day'))\n"
+        f"      e.g. WHERE weekday = TRIM(TO_CHAR((now() AT TIME ZONE 'Asia/Kolkata')::date, 'Day'))\n"
+        f"   b. Always use (now() AT TIME ZONE 'Asia/Kolkata')::date as 'today'.\n"
+        f"      tomorrow = (now() AT TIME ZONE 'Asia/Kolkata')::date + 1\n"
+        f"      Do NOT use CURRENT_DATE for timetable weekday comparisons.\n"
+        f"4. If asking for students with attendance problems and dues, JOIN student_attendance_30d with emi_due_this_week.\n"
+        f"5. Always append LIMIT 200.\n"
+        f"6. REFUSALS: If the question asks for data your role cannot access, reply with exactly:\n"
+        f"   REFUSE: <short plain-English reason>\n"
+        f"   Do NOT output SQL for forbidden data. Do NOT output any other text before REFUSE:."
     )
 
+    is_saved_query = False
     try:
         raw_sql = generate_gemini_sql(api_key, system_instruction, question)
     except Exception as e:
         logger.error(f"[Gemini API Call Failed]: {e}")
+        # --- SAVED QUERY FALLBACK (Requirement 4) ---
+        fallback_sql = find_saved_query(question)
+        if fallback_sql:
+            logger.info(f"[Saved Query Fallback] Using pre-verified query for: {question[:80]}")
+            raw_sql = fallback_sql
+            is_saved_query = True
+        else:
+            return {
+                "status": "error",
+                "answer": "The AI service is busy right now. Please try again in a moment.",
+                "columns": [],
+                "rows": [],
+                "sql": "-- Error communicating with Gemini API",
+                "blocked_layer": "llm",
+                "blocked_reason": "The AI service is busy right now. Please try again in a moment.",
+                "row_count": 0,
+                "duration_ms": int((time.time() - start_time) * 1000),
+                "tables_used": [],
+                "can_draft_reminders": False,
+            }
+
+    # --- REFUSE DETECTION (Requirement 2) ---
+    raw_sql_clean = strip_ansi(raw_sql)
+    upper_sql = raw_sql_clean.lstrip().upper()
+    if not (upper_sql.startswith("SELECT") or upper_sql.startswith("WITH")):
+        # Treat anything that doesn't start with SELECT/WITH as a refusal
+        refusal_text = raw_sql_clean.strip()
+        reason_match = re.match(r"^REFUSE:\s*(.+)", refusal_text, re.IGNORECASE | re.DOTALL)
+        if reason_match:
+            reason = reason_match.group(1).strip().split("\n")[0]
+        else:
+            reason = refusal_text.split("\n")[0][:200]
+        logger.info(f"[Copilot Refusal] role={role} reason={reason!r}")
         return {
-            "status": "error",
-            "answer": "The AI service is busy right now. Please try again in a moment.",
+            "status": "blocked",
+            "answer": f"This question needs data your role cannot see: {reason}",
             "columns": [],
             "rows": [],
-            "sql": "-- Error communicating with Gemini API",
-            "blocked_layer": "llm",
-            "blocked_reason": "The AI service is busy right now. Please try again in a moment.",
+            "sql": "-- REFUSED BY MODEL: permission boundary",
+            "blocked_layer": "role view",
+            "blocked_reason": reason,
             "row_count": 0,
             "duration_ms": int((time.time() - start_time) * 1000),
             "tables_used": [],
             "can_draft_reminders": False,
         }
 
-    # --- SQLGLOT AST VALIDATION (Item 2) ---
+    # --- SQLGLOT AST VALIDATION ---
     try:
-        validated_sql = validate_and_format_sql(raw_sql, role)
+        validated_sql = validate_and_format_sql(raw_sql_clean, role)
     except SecurityViolation as sv:
         return {
             "status": "blocked",
-            "answer": f"Query blocked by {sv.layer}: {sv.message}",
+            "answer": f"This question needs data your role cannot see: {sv.message}",
             "columns": [],
             "rows": [],
-            "sql": f"-- BLOCKED: {raw_sql}",
+            "sql": f"-- BLOCKED: {raw_sql_clean}",
             "blocked_layer": sv.layer,
             "blocked_reason": sv.message,
             "row_count": 0,
@@ -516,6 +693,24 @@ async def process_copilot_ask(question: str, role: str) -> Dict[str, Any]:
             "can_draft_reminders": False,
         }
 
+    # --- Log saved query to query_logs with flag ---
+    if is_saved_query:
+        try:
+            import uuid
+            sb.table("query_logs").insert({
+                "id": str(uuid.uuid4()),
+                "question": question,
+                "sql": validated_sql,
+                "role": role,
+                "status": "SAVED_QUERY",
+                "blocked_reason": None,
+                "blocked_layer": None,
+                "row_count": len(query_rows),
+                "duration_ms": int((time.time() - start_time) * 1000),
+            }).execute()
+        except Exception as log_err:
+            logger.warning(f"[query_logs saved_query insert error]: {log_err}")
+
     # --- FORMAT RESULTS & PLAIN-ENGLISH ANSWER (Item 4 & 5) ---
     columns = list(query_rows[0].keys()) if query_rows else []
     table_rows = [[r.get(c) for c in columns] for r in query_rows]
@@ -528,10 +723,15 @@ async def process_copilot_ask(question: str, role: str) -> Dict[str, Any]:
         withheld_note = " Fee and financial columns were redacted per role permissions."
         status = "partial"
 
-    if query_rows:
-        answer = f"Found {len(query_rows)} matching records from live database.{withheld_note}"
+    if is_saved_query:
+        saved_note = " AI service unavailable, showing a saved query."
     else:
-        answer = f"No matching records found for this query in the database.{withheld_note}"
+        saved_note = ""
+
+    if query_rows:
+        answer = f"Found {len(query_rows)} matching records from live database.{withheld_note}{saved_note}"
+    else:
+        answer = f"No matching records found for this query in the database.{withheld_note}{saved_note}"
 
     # --- DRAFT WHATSAPP REMINDERS ACTION (Item 6) ---
     can_draft = False
@@ -583,4 +783,5 @@ async def process_copilot_ask(question: str, role: str) -> Dict[str, Any]:
         "generated_actions": generated_actions if can_draft else None,
         "blocked_layer": "role view" if status == "partial" else None,
         "blocked_reason": "Financial scope restricted" if status == "partial" else None,
+        "saved_query": is_saved_query,
     }
