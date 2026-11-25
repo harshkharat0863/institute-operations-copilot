@@ -47,29 +47,6 @@ function handleAuthStatus(status: number) {
   }
 }
 
-let pendingRequestsCount = 0;
-let coldStartTimer: any = null;
-
-function onRequestStart() {
-  pendingRequestsCount++;
-  if (pendingRequestsCount === 1 && !coldStartTimer && typeof window !== 'undefined') {
-    coldStartTimer = setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('server_cold_start', { detail: { isWaking: true } }));
-    }, 3000);
-  }
-}
-
-function onRequestEnd() {
-  pendingRequestsCount = Math.max(0, pendingRequestsCount - 1);
-  if (pendingRequestsCount === 0 && typeof window !== 'undefined') {
-    if (coldStartTimer) {
-      clearTimeout(coldStartTimer);
-      coldStartTimer = null;
-    }
-    window.dispatchEvent(new CustomEvent('server_cold_start', { detail: { isWaking: false } }));
-  }
-}
-
 /**
  * Generic fetch wrapper for FastAPI backend
  */
@@ -87,7 +64,6 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  onRequestStart();
   try {
     const res = await fetch(url, {
       ...options,
@@ -111,12 +87,40 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
   } catch (err: any) {
     console.error(`API fetch failed on ${endpoint}:`, err);
     throw err;
-  } finally {
-    onRequestEnd();
   }
 }
 
 export const api = {
+  // Health & Cold Start Detection (triggers 'server_cold_start' ONLY if /health takes > 3s)
+  async checkHealth(): Promise<{ status: string; database?: string }> {
+    let coldStartTimer: any = null;
+    let didTriggerNotice = false;
+
+    if (typeof window !== 'undefined') {
+      coldStartTimer = setTimeout(() => {
+        didTriggerNotice = true;
+        window.dispatchEvent(new CustomEvent('server_cold_start', { detail: { isWaking: true } }));
+      }, 3000);
+    }
+
+    try {
+      const baseUrl = getApiBaseUrl().replace(/\/$/, '');
+      const url = `${baseUrl}/health`;
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (!res.ok) {
+        throw new Error(`Health probe returned ${res.status}`);
+      }
+      return await res.json();
+    } finally {
+      if (coldStartTimer) {
+        clearTimeout(coldStartTimer);
+        coldStartTimer = null;
+      }
+      if (didTriggerNotice && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('server_cold_start', { detail: { isWaking: false } }));
+      }
+    }
+  },
   // 1. Authentication
   async login(email: string, password: string): Promise<{ token: string; user: User }> {
     const data = await apiFetch<{ token: string; user: User }>('/auth/login', {

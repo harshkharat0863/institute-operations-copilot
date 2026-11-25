@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Server, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { api } from '../../lib/api';
 
 export const ColdStartNotice: React.FC = () => {
   const [isWaking, setIsWaking] = useState(false);
@@ -24,6 +25,12 @@ export const ColdStartNotice: React.FC = () => {
     };
 
     window.addEventListener('server_cold_start', handleColdStart);
+
+    // Initial /health check probe to detect if sleeping container is waking up
+    api.checkHealth().catch(() => {
+      // Backend may still be initializing or starting; ignore probe rejection
+    });
+
     return () => {
       window.removeEventListener('server_cold_start', handleColdStart);
       if (timer) clearInterval(timer);

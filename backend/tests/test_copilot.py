@@ -255,3 +255,55 @@ def test_gemini_all_retries_fail_returns_friendly_message():
         assert res["answer"] == "The AI service is busy right now. Please try again in a moment."
         assert "Backend server cluster failure" not in res["answer"]
 
+
+def test_gemini_hung_call_times_out_and_retries():
+    """A hung Gemini call times out and moves to retry instead of waiting indefinitely."""
+    import threading
+    from backend.copilot import generate_gemini_sql
+
+    mock_client = MagicMock()
+    mock_success_response = MagicMock(text="SELECT student_name FROM students LIMIT 200")
+
+    call_count = 0
+    def mock_generate_content(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            # Block the worker thread for 0.5s so 0.05s call timeout triggers
+            threading.Event().wait(0.5)
+            return MagicMock(text="late response")
+        return mock_success_response
+
+    mock_client.models.generate_content.side_effect = mock_generate_content
+
+    with patch("backend.copilot.GEMINI_CALL_TIMEOUT_SECONDS", 0.05), \
+         patch("google.genai.Client", return_value=mock_client), \
+         patch("time.sleep") as mock_sleep:
+
+        sql = generate_gemini_sql(
+            api_key="test-api-key",
+            system_instruction="Generate SELECT",
+            question="Show students"
+        )
+
+        assert sql == "SELECT student_name FROM students LIMIT 200"
+        assert call_count == 2
+        mock_sleep.assert_called_once_with(1.0)
+
+
+def test_gemini_total_timeout_budget_enforced():
+    """When the total 45-second deadline budget is exhausted, retries stop and friendly error is returned."""
+    mock_client = MagicMock()
+    mock_client.models.generate_content.side_effect = Exception("503 UNAVAILABLE")
+
+    # Set total budget to 0.01 seconds so it immediately trips
+    with patch("backend.copilot.GEMINI_TOTAL_TIMEOUT_BUDGET_SECONDS", 0.01), \
+         patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}), \
+         patch("google.genai.Client", return_value=mock_client), \
+         patch("time.sleep"):
+
+        res = asyncio.run(process_copilot_ask("Show all students", role="owner"))
+        assert res["status"] == "error"
+        assert res["answer"] == "The AI service is busy right now. Please try again in a moment."
+
+

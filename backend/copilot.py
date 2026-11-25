@@ -6,6 +6,7 @@ import os
 import re
 import time
 import logging
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from typing import Dict, Any, List, Set, Optional
 import sqlglot
 from sqlglot import exp
@@ -18,6 +19,11 @@ logger = logging.getLogger("institute_ops.copilot")
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL")
+
+GEMINI_CALL_TIMEOUT_SECONDS = 20.0
+GEMINI_TOTAL_TIMEOUT_BUDGET_SECONDS = 45.0
+
+_gemini_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="gemini_copilot")
 
 # -------------------------------------------------------------
 # 1. ROLE-BASED SCHEMA WHITELISTS (Item 1 & 2)
@@ -228,24 +234,62 @@ def _is_retryable_gemini_error(exc: Exception) -> bool:
     return False
 
 
-def _call_gemini_model_with_retries(client: Any, model: str, system_instruction: str, question: str) -> str:
-    """Attempt call with model; if 503, 429, or timeout, retry up to 3 times with waits 1s, 2s, 4s."""
+def _call_gemini_model_with_retries(
+    client: Any,
+    model: str,
+    system_instruction: str,
+    question: str,
+    deadline: float,
+) -> str:
+    """Attempt call with model; if 503, 429, or timeout, retry up to 3 times with waits 1s, 2s, 4s.
+    Enforces a 20-second timeout per call and respects total 45-second deadline budget."""
     retry_delays = [1.0, 2.0, 4.0]
     max_attempts = 1 + len(retry_delays)  # 1 initial + 3 retries = 4 attempts
     last_exc = None
 
     for attempt in range(max_attempts):
+        time_remaining = deadline - time.time()
+        if time_remaining <= 0.5:
+            logger.warning(
+                f"Total copilot Gemini deadline reached before attempt {attempt + 1}/{max_attempts} for model '{model}'"
+            )
+            raise TimeoutError(f"Total time budget of {GEMINI_TOTAL_TIMEOUT_BUDGET_SECONDS}s exhausted")
+
+        call_timeout = min(GEMINI_CALL_TIMEOUT_SECONDS, time_remaining)
+
         try:
-            logger.info(f"Invoking Gemini model '{model}' (attempt {attempt + 1}/{max_attempts})")
-            gen_response = client.models.generate_content(
+            logger.info(
+                f"Invoking Gemini model '{model}' (attempt {attempt + 1}/{max_attempts}, call timeout: {call_timeout:.1f}s)"
+            )
+            # Submit to thread executor so hung requests fail after call_timeout seconds
+            future = _gemini_executor.submit(
+                client.models.generate_content,
                 model=model,
                 contents=[system_instruction, f"User Question: {question}"],
             )
+            gen_response = future.result(timeout=call_timeout)
             return gen_response.text.strip()
+        except (TimeoutError, FutureTimeoutError) as te:
+            last_exc = te
+            logger.warning(
+                f"Gemini model '{model}' call timed out after {call_timeout:.1f}s (attempt {attempt + 1}/{max_attempts})"
+            )
+            if attempt < len(retry_delays):
+                delay = retry_delays[attempt]
+                if time.time() + delay >= deadline - 0.5:
+                    logger.warning("Remaining time budget insufficient for subsequent retry delay; terminating retries")
+                    break
+                logger.info(f"Retrying Gemini call in {delay}s...")
+                time.sleep(delay)
+            else:
+                break
         except Exception as e:
             last_exc = e
             if attempt < len(retry_delays) and _is_retryable_gemini_error(e):
                 delay = retry_delays[attempt]
+                if time.time() + delay >= deadline - 0.5:
+                    logger.warning("Remaining time budget insufficient for subsequent retry delay; terminating retries")
+                    break
                 logger.warning(
                     f"Gemini model '{model}' failed with retryable error (attempt {attempt + 1}/{max_attempts}): {e}. Retrying in {delay}s..."
                 )
@@ -259,30 +303,51 @@ def _call_gemini_model_with_retries(client: Any, model: str, system_instruction:
 
 
 def generate_gemini_sql(api_key: str, system_instruction: str, question: str) -> str:
-    """Invoke Gemini model to generate SQL query with retry and fallback model resilience."""
+    """Invoke Gemini model to generate SQL query with 20-second per-call timeout, retry, and fallback model resilience
+    staying under total ~45-second deadline budget."""
     from google import genai
-    client = genai.Client(api_key=api_key)
+    from google.genai import types
+
+    # Initialize client with 20-second default request timeout on HTTP layer
+    try:
+        client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=int(GEMINI_CALL_TIMEOUT_SECONDS * 1000)),
+        )
+    except Exception:
+        client = genai.Client(api_key=api_key)
 
     primary_model = os.getenv("GEMINI_MODEL", GEMINI_MODEL)
     fallback_model = os.getenv("GEMINI_FALLBACK_MODEL", GEMINI_FALLBACK_MODEL)
 
+    start_time = time.time()
+    deadline = start_time + GEMINI_TOTAL_TIMEOUT_BUDGET_SECONDS
+
     last_error = None
     # 1. Try primary model with up to 3 retries (waits: 1s, 2s, 4s)
     try:
-        return _call_gemini_model_with_retries(client, primary_model, system_instruction, question)
+        return _call_gemini_model_with_retries(client, primary_model, system_instruction, question, deadline)
     except Exception as e:
         last_error = e
-        logger.error(f"Primary Gemini model '{primary_model}' exhausted retries: {e}")
+        logger.error(f"Primary Gemini model '{primary_model}' exhausted retries or timed out: {e}")
 
-    # 2. Try fallback model if configured and distinct, with same retry rules
-    if fallback_model and fallback_model.strip() and fallback_model.strip() != primary_model:
+    # 2. Try fallback model if configured, distinct, and remaining time budget allows
+    time_remaining_for_fallback = deadline - time.time()
+    if (
+        fallback_model
+        and fallback_model.strip()
+        and fallback_model.strip() != primary_model
+        and time_remaining_for_fallback > 1.0
+    ):
         fallback_model = fallback_model.strip()
-        logger.warning(f"Attempting fallback Gemini model '{fallback_model}'...")
+        logger.warning(
+            f"Attempting fallback Gemini model '{fallback_model}' (budget remaining: {time_remaining_for_fallback:.1f}s)..."
+        )
         try:
-            return _call_gemini_model_with_retries(client, fallback_model, system_instruction, question)
+            return _call_gemini_model_with_retries(client, fallback_model, system_instruction, question, deadline)
         except Exception as e:
             last_error = e
-            logger.error(f"Fallback Gemini model '{fallback_model}' exhausted retries: {e}")
+            logger.error(f"Fallback Gemini model '{fallback_model}' exhausted retries or timed out: {e}")
 
     # 3. Log details to server log and return friendly message
     logger.error(f"All Gemini models and retries exhausted. Raw error details: {last_error}", exc_info=True)
