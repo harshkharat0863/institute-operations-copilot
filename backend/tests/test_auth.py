@@ -10,7 +10,10 @@ from fastapi.testclient import TestClient
 
 os.environ.setdefault("JWT_SECRET", "test-jwt-secret-key-for-pytest-suite-2026-very-secure")
 
-from backend.main import app, JWT_SECRET, JWT_ALGORITHM, _login_attempts
+from backend.main import (
+    app, JWT_SECRET, JWT_ALGORITHM, _login_attempts,
+    _public_stats_attempts, _public_stats_cache
+)
 from backend.models import UserRole
 
 # Standard demo users for testing
@@ -120,10 +123,16 @@ class MockSupabaseClient:
 
 @pytest.fixture(autouse=True)
 def setup_test_env():
-    """Reset in-memory login rate limiter before each test."""
+    """Reset in-memory rate limiters and cache before each test."""
     _login_attempts.clear()
+    _public_stats_attempts.clear()
+    _public_stats_cache["data"] = None
+    _public_stats_cache["expires_at"] = 0.0
     yield
     _login_attempts.clear()
+    _public_stats_attempts.clear()
+    _public_stats_cache["data"] = None
+    _public_stats_cache["expires_at"] = 0.0
 
 
 @pytest.fixture
@@ -270,3 +279,50 @@ def test_unknown_api_route_returns_404_json():
     assert resp.status_code == 404
     assert resp.headers["content-type"].startswith("application/json")
     assert resp.json()["detail"] == "Not found"
+
+
+def test_public_stats_shape_and_no_pii(mock_supabase):
+    resp = client.get("/public/stats")
+    assert resp.status_code == 200
+    data = resp.json()
+    expected_keys = {"classes_today", "active_students", "attendance_rate_30d", "emis_due_this_week"}
+    assert set(data.keys()) == expected_keys
+    assert isinstance(data["classes_today"], int)
+    assert isinstance(data["active_students"], int)
+    assert isinstance(data["attendance_rate_30d"], (int, float))
+    assert isinstance(data["emis_due_this_week"], int)
+    # Verify no PII
+    for pii_key in ("name", "student_name", "email", "phone", "phone_masked", "password", "id", "student_id"):
+        assert pii_key not in data
+
+
+def test_public_stats_rate_limiting(mock_supabase):
+    # Public stats limit is 30 requests per minute
+    for _ in range(30):
+        resp = client.get("/public/stats")
+        assert resp.status_code == 200
+
+    # 31st request must be rate limited
+    blocked = client.get("/public/stats")
+    assert blocked.status_code == 429
+    assert "Too many requests" in blocked.json()["detail"]
+
+
+def test_public_stats_server_cache_30s(mock_supabase):
+    # Prime cache
+    resp1 = client.get("/public/stats")
+    assert resp1.status_code == 200
+    data1 = resp1.json()
+
+    # With cache primed, second call returns cached data1
+    with patch("backend.repository.repo.get_public_stats") as mock_get:
+        mock_get.return_value = {
+            "classes_today": 999,
+            "active_students": 999,
+            "attendance_rate_30d": 99.9,
+            "emis_due_this_week": 999
+        }
+        resp2 = client.get("/public/stats")
+        assert resp2.status_code == 200
+        assert resp2.json() == data1
+        assert not mock_get.called

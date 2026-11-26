@@ -24,7 +24,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {
       // Ignore storage errors in restricted contexts
     }
-    return 'dark';
+    return 'light';
   });
 
   useEffect(() => {

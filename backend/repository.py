@@ -966,5 +966,64 @@ class Repository:
             logger.error(f"[get_dashboard_analytics error]: {e}")
             raise HTTPException(status_code=503, detail=f"Database aggregation error: {str(e)}")
 
+    # -------------------------------------------------------------
+    # 18. PUBLIC AGGREGATE STATS (Landing page live counters)
+    # -------------------------------------------------------------
+    async def get_public_stats(self) -> dict:
+        sb = get_db()
+        import datetime
+        ist = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+        current_weekday_ist = datetime.datetime.now(ist).strftime("%A")
+
+        classes_today = 0
+        active_students = 0
+        attendance_rate_30d = 0.0
+        emis_due_this_week = 0
+
+        if not sb:
+            return {
+                "classes_today": 0,
+                "active_students": 0,
+                "attendance_rate_30d": 0.0,
+                "emis_due_this_week": 0,
+            }
+
+        try:
+            # 1. Classes scheduled today using IST date rule and TRIM(TO_CHAR(...,'Day'))
+            try:
+                sql = "SELECT COUNT(*)::int AS count FROM timetable_sessions WHERE weekday = TRIM(TO_CHAR((now() AT TIME ZONE 'Asia/Kolkata')::date, 'Day'))"
+                res = sb.rpc("run_readonly_query", {"sql_text": sql}).execute()
+                if res.data and len(res.data) > 0:
+                    classes_today = int(res.data[0].get("count") or 0)
+                else:
+                    classes_today = 0
+            except Exception:
+                # Direct table query fallback (e.g. for mock clients or when rpc is unavailable)
+                t_res = sb.table("timetable_sessions").select("id, weekday").execute()
+                classes_today = sum(1 for s in (t_res.data or []) if (s.get("weekday") or "").strip() == current_weekday_ist)
+
+            # 2. Active students count from students table
+            s_res = sb.table("students").select("id, status").execute()
+            active_students = sum(1 for s in (s_res.data or []) if s.get("status") == "active")
+
+            # 3. Average attendance rate (last 30 days) from student_attendance_30d view
+            att_res = sb.table("student_attendance_30d").select("attendance_rate").execute()
+            rates = [float(r["attendance_rate"]) for r in (att_res.data or []) if r.get("attendance_rate") is not None]
+            attendance_rate_30d = round(sum(rates) / len(rates), 1) if rates else 0.0
+
+            # 4. EMIs due this week count from emi_due_this_week view
+            emi_res = sb.table("emi_due_this_week").select("emi_id").execute()
+            emis_due_this_week = len(emi_res.data or [])
+
+            return {
+                "classes_today": int(classes_today),
+                "active_students": int(active_students),
+                "attendance_rate_30d": float(attendance_rate_30d),
+                "emis_due_this_week": int(emis_due_this_week),
+            }
+        except Exception as e:
+            logger.error(f"[get_public_stats error]: {e}")
+            raise HTTPException(status_code=503, detail=f"Database aggregation error: {str(e)}")
+
 
 repo = Repository()

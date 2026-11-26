@@ -121,6 +121,22 @@ export const api = {
       }
     }
   },
+
+  // Public live statistics for landing screen
+  async getPublicStats(): Promise<{
+    classes_today: number;
+    active_students: number;
+    attendance_rate_30d: number;
+    emis_due_this_week: number;
+  }> {
+    const baseUrl = getApiBaseUrl().replace(/\/$/, '');
+    const res = await fetch(`${baseUrl}/public/stats`, { cache: 'no-cache' });
+    if (!res.ok) {
+      throw new Error(`Failed to load public stats (${res.status})`);
+    }
+    return await res.json();
+  },
+
   // 1. Authentication
   async login(email: string, password: string): Promise<{ token: string; user: User }> {
     const data = await apiFetch<{ token: string; user: User }>('/auth/login', {

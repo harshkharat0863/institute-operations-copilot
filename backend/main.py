@@ -101,6 +101,25 @@ def _check_rate_limit(client_ip: str) -> None:
         raise HTTPException(status_code=429, detail="Too many login attempts. Please try again later.")
     _login_attempts[client_ip].append(now)
 
+_public_stats_attempts: dict[str, list[float]] = defaultdict(list)
+PUBLIC_STATS_RATE_WINDOW = 60  # seconds
+PUBLIC_STATS_RATE_MAX = 30  # max 30 public stats requests per window per IP
+
+def _check_public_stats_rate_limit(client_ip: str) -> None:
+    """Raise 429 if more than PUBLIC_STATS_RATE_MAX requests within PUBLIC_STATS_RATE_WINDOW."""
+    now = time.time()
+    attempts = _public_stats_attempts[client_ip]
+    _public_stats_attempts[client_ip] = [t for t in attempts if now - t < PUBLIC_STATS_RATE_WINDOW]
+    if len(_public_stats_attempts[client_ip]) >= PUBLIC_STATS_RATE_MAX:
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+    _public_stats_attempts[client_ip].append(now)
+
+# Server-side 30-second cache for public landing page stats
+_public_stats_cache = {
+    "data": None,
+    "expires_at": 0.0,
+}
+
 # --------------- AUTH HELPERS ---------------
 
 def create_jwt_token(user: dict) -> str:
@@ -430,6 +449,22 @@ async def get_dashboard_analytics(user: dict = Depends(get_current_user)):
     return await repo.get_dashboard_analytics()
 
 
+# Public aggregate stats for landing screen (cached for 30s, rate-limited, no PII)
+@app.get("/public/stats")
+async def get_public_stats(request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    _check_public_stats_rate_limit(client_ip)
+
+    now = time.time()
+    if _public_stats_cache["data"] is not None and now < _public_stats_cache["expires_at"]:
+        return _public_stats_cache["data"]
+
+    stats = await repo.get_public_stats()
+    _public_stats_cache["data"] = stats
+    _public_stats_cache["expires_at"] = now + 30.0
+    return stats
+
+
 # Health check - verifies service liveness and live Supabase connection
 @app.get("/health")
 async def health():
@@ -481,7 +516,7 @@ class ImmutableStaticFiles(StaticFiles):
 
 # Known API path prefixes — requests that start with these should NOT fall through to SPA
 API_PREFIXES = (
-    "/api/", "/auth/", "/students", "/batches", "/courses", "/trainers",
+    "/api/", "/auth/", "/public/", "/public", "/students", "/batches", "/courses", "/trainers",
     "/fees/", "/attendance", "/copilot/", "/actions", "/timetable/",
     "/audit", "/query-log", "/redteam/", "/certifications", "/recordings",
     "/dashboard", "/health", "/docs", "/openapi.json",
