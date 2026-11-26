@@ -588,3 +588,83 @@ def test_saved_queries_all_pass_validation():
         validated = validate_and_format_sql(sql, role=role)
         assert "SELECT" in validated, f"Saved query '{key}' did not produce valid SELECT"
         assert "LIMIT 200" in validated, f"Saved query '{key}' missing LIMIT 200"
+
+
+# -------------------------------------------------------------
+# 9. SELF-REPAIR, COLUMN CHECKS & EXTENDED FALLBACK TESTS
+# -------------------------------------------------------------
+def test_pre_execution_column_check_catches_nonexistent_column():
+    """Column check before execution catches s.batch_name on student_attendance_30d without DB call."""
+    wrong_sql = "SELECT s.student_name, s.batch_name FROM student_attendance_30d s"
+    with pytest.raises(SecurityViolation) as exc_info:
+        validate_and_format_sql(wrong_sql, role="counselor")
+
+    assert "batch_name" in str(exc_info.value)
+    assert "student_attendance_30d" in str(exc_info.value)
+    assert exc_info.value.layer == "schema validator"
+
+
+def test_self_repair_succeeds_on_second_attempt():
+    """Mocked Gemini returns wrong SQL first (nonexistent column) and corrected SQL on repair."""
+    wrong_sql = (
+        "SELECT a.student_name, a.batch_name FROM student_attendance_30d a WHERE a.missed_classes_last_30d >= 3"
+    )
+    corrected_sql = (
+        "SELECT e.student_name, e.batch_name, a.missed_classes_last_30d, e.amount AS emi_amount, e.due_date "
+        "FROM student_attendance_30d a "
+        "JOIN emi_due_this_week e ON e.student_id = a.student_id "
+        "WHERE e.batch_name ILIKE '%Java%' AND a.missed_classes_last_30d >= 3 "
+        "LIMIT 200"
+    )
+
+    mock_db_rows = [
+        {"student_name": "Aditya Roy", "batch_name": "Fullstack Java Evening", "missed_classes_last_30d": 3,
+         "emi_amount": 7500, "due_date": "2026-11-28"}
+    ]
+    mock_rpc_res = MagicMock()
+    mock_rpc_res.data = mock_db_rows
+    mock_sb = MagicMock()
+    mock_sb.rpc.return_value.execute.return_value = mock_rpc_res
+
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}), \
+         patch("backend.copilot.generate_gemini_sql", return_value=wrong_sql), \
+         patch("backend.copilot.repair_gemini_sql", return_value=corrected_sql) as mock_repair, \
+         patch("backend.copilot.get_supabase", return_value=mock_sb):
+
+        question = "Which students in the Java batch have missed three or more classes and have an EMI due this week?"
+        res = asyncio.run(process_copilot_ask(question, role="counselor"))
+
+        assert res["status"] == "ok"
+        assert res["row_count"] == 1
+        assert res["rows"][0][0] == "Aditya Roy"
+        assert mock_repair.call_count == 1
+        # Confirm repair was called with error details
+        _, kwargs = mock_repair.call_args
+        assert "batch_name" in kwargs["error_msg"]
+
+
+def test_all_repairs_fail_and_saved_query_fallback_used():
+    """When all self-repairs fail, saved query fallback is used for recognized questions."""
+    wrong_sql = "SELECT a.student_name, a.batch_name FROM student_attendance_30d a"
+
+    mock_db_rows = [
+        {"student_name": "Priya Sen", "batch_name": "Java Batch A", "phone": "9876543210",
+         "missed_classes_last_30d": 3, "emi_amount": 8000, "due_date": "2026-11-27", "attendance_rate": 65.0}
+    ]
+    mock_rpc_res = MagicMock()
+    mock_rpc_res.data = mock_db_rows
+    mock_sb = MagicMock()
+    mock_sb.rpc.return_value.execute.return_value = mock_rpc_res
+
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}), \
+         patch("backend.copilot.generate_gemini_sql", return_value=wrong_sql), \
+         patch("backend.copilot.repair_gemini_sql", side_effect=Exception("Gemini quota exhausted")), \
+         patch("backend.copilot.get_supabase", return_value=mock_sb):
+
+        question = "Which students in the Java batch have missed three or more classes and have an EMI due this week?"
+        res = asyncio.run(process_copilot_ask(question, role="counselor"))
+
+        assert res["status"] == "ok"
+        assert "saved query" in res["answer"].lower()
+        assert res["row_count"] == 1
+        assert res["rows"][0][0] == "Priya Sen"

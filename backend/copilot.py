@@ -122,6 +122,22 @@ NOTE: Detailed class recordings and technical logs are restricted.
 # -------------------------------------------------------------
 # 2. SQLGLOT AST VALIDATOR (Item 2)
 # -------------------------------------------------------------
+def _parse_role_table_columns() -> Dict[str, Dict[str, Set[str]]]:
+    """Parse ROLE_SCHEMAS text to map role -> table_name -> set of allowed columns."""
+    res: Dict[str, Dict[str, Set[str]]] = {}
+    for r, text in ROLE_SCHEMAS.items():
+        res[r] = {}
+        for line in text.splitlines():
+            m = re.match(r"^\s*-\s*(\w+)\s*\(([^)]+)\)", line)
+            if m:
+                t_name = m.group(1).lower().strip()
+                cols = {c.strip().lower() for c in m.group(2).split(",") if c.strip()}
+                res[r][t_name] = cols
+    return res
+
+ROLE_TABLE_COLUMNS: Dict[str, Dict[str, Set[str]]] = _parse_role_table_columns()
+
+
 def strip_ansi(text: str) -> str:
     """Strips ANSI escape codes (e.g. \x1b[4m, [4m, \x1b[0m, [0m) from text."""
     clean = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", text)
@@ -329,6 +345,36 @@ def validate_and_format_sql(sql_query: str, role: str) -> str:
                 layer="role view"
             )
 
+    # Check that referenced columns exist in the table/view (Column check before execution)
+    role_tables_schema = ROLE_TABLE_COLUMNS.get(role, {})
+    alias_map: Dict[str, str] = {}
+    for t in stmt.find_all(exp.Table):
+        t_name = t.name.lower()
+        t_alias = t.alias.lower() if t.alias else t_name
+        alias_map[t_alias] = t_name
+
+    for col in stmt.find_all(exp.Column):
+        c_name = col.name.lower()
+        if col.table:
+            tbl_ref = col.table.lower()
+            actual_table = alias_map.get(tbl_ref, tbl_ref)
+            if actual_table in role_tables_schema:
+                allowed_cols = role_tables_schema[actual_table]
+                if c_name not in allowed_cols:
+                    raise SecurityViolation(
+                        f"Column '{c_name}' does not exist on table/view '{actual_table}'.",
+                        layer="schema validator"
+                    )
+        elif len(found_tables) == 1:
+            single_table = next(iter(found_tables))
+            if single_table in role_tables_schema:
+                allowed_cols = role_tables_schema[single_table]
+                if c_name not in allowed_cols:
+                    raise SecurityViolation(
+                        f"Column '{c_name}' does not exist on table/view '{single_table}'.",
+                        layer="schema validator"
+                    )
+
     # Force LIMIT <= 200
     limit_exp = stmt.args.get("limit")
     if not limit_exp:
@@ -434,6 +480,80 @@ def _call_gemini_model_with_retries(
                     break
 
     raise last_exc
+
+
+def _log_query_attempt(sb: Any, question: str, sql_text: str, role: str, status: str, blocked_reason: Optional[str], blocked_layer: Optional[str], row_count: int, duration_ms: int):
+    """Helper to log an attempt to query_logs table."""
+    if not sb:
+        return
+    try:
+        import uuid
+        sb.table("query_logs").insert({
+            "id": str(uuid.uuid4()),
+            "question": question,
+            "sql": sql_text,
+            "role": role,
+            "status": status,
+            "blocked_reason": blocked_reason,
+            "blocked_layer": blocked_layer,
+            "row_count": row_count,
+            "duration_ms": duration_ms,
+        }).execute()
+    except Exception as log_err:
+        logger.warning(f"[query_logs insert error]: {log_err}")
+
+
+def repair_gemini_sql(
+    api_key: str,
+    role_schema: str,
+    failed_sql: str,
+    error_msg: str,
+    deadline: float,
+) -> str:
+    """Send Gemini the failed SQL, exact error message, and role schema to request a corrected single SELECT."""
+    repair_instruction = (
+        "You are a PostgreSQL Text-to-SQL expert for an educational institute operations platform.\n"
+        "Your previously generated SQL query failed with an error. Please fix the SQL query.\n\n"
+        f"STRICT SCHEMA CONTEXT:\n{role_schema}\n\n"
+        "RULES:\n"
+        "1. Output ONLY the raw corrected SQL SELECT query. Do NOT include markdown code fences (```), commentary, or explanations.\n"
+        "2. Only use columns listed for each view. student_attendance_30d has NO batch_name and NO phone. batch_name and phone are in emi_due_this_week; names are in students and batch_summary.\n"
+        "3. Always append LIMIT 200.\n"
+    )
+    repair_prompt = (
+        f"The previous SQL query failed:\n"
+        f"FAILED SQL:\n{failed_sql}\n\n"
+        f"ERROR MESSAGE:\n{error_msg}\n\n"
+        f"Please provide the corrected single PostgreSQL SELECT query:"
+    )
+
+    from google import genai
+    from google.genai import types
+
+    try:
+        client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=int(GEMINI_CALL_TIMEOUT_SECONDS * 1000)),
+        )
+    except Exception:
+        client = genai.Client(api_key=api_key)
+
+    primary_model = os.getenv("GEMINI_MODEL", GEMINI_MODEL)
+    fallback_model = os.getenv("GEMINI_FALLBACK_MODEL", GEMINI_FALLBACK_MODEL)
+
+    try:
+        return _call_gemini_model_with_retries(client, primary_model, repair_instruction, repair_prompt, deadline)
+    except Exception as e:
+        logger.error(f"Primary model repair failed: {e}")
+        time_rem = deadline - time.time()
+        if (
+            fallback_model
+            and fallback_model.strip()
+            and fallback_model.strip() != primary_model
+            and time_rem > 1.0
+        ):
+            return _call_gemini_model_with_retries(client, fallback_model.strip(), repair_instruction, repair_prompt, deadline)
+        raise
 
 
 def generate_gemini_sql(api_key: str, system_instruction: str, question: str) -> str:
@@ -581,18 +701,28 @@ async def process_copilot_ask(question: str, role: str) -> Dict[str, Any]:
         f"      tomorrow = (now() AT TIME ZONE 'Asia/Kolkata')::date + 1\n"
         f"      Do NOT use CURRENT_DATE for timetable weekday comparisons.\n"
         f"4. If asking for students with attendance problems and dues, JOIN student_attendance_30d with emi_due_this_week.\n"
+        f"   Only use columns listed for each view. student_attendance_30d has NO batch_name and NO phone. batch_name and phone are in emi_due_this_week; names are in students and batch_summary.\n"
+        f"   Example for benchmark pattern (students with missed classes and EMI due):\n"
+        f"   SELECT e.student_name, e.batch_name, a.missed_classes_last_30d, e.amount AS emi_amount, e.due_date\n"
+        f"   FROM student_attendance_30d a\n"
+        f"   JOIN emi_due_this_week e ON e.student_id = a.student_id\n"
+        f"   WHERE e.batch_name ILIKE '%Java%' AND a.missed_classes_last_30d >= 3\n"
+        f"   LIMIT 200\n"
         f"5. Always append LIMIT 200.\n"
         f"6. REFUSALS: If the question asks for data your role cannot access, reply with exactly:\n"
         f"   REFUSE: <short plain-English reason>\n"
         f"   Do NOT output SQL for forbidden data. Do NOT output any other text before REFUSE:."
     )
 
+    deadline = start_time + GEMINI_TOTAL_TIMEOUT_BUDGET_SECONDS
     is_saved_query = False
+    sb = get_supabase()
+
     try:
         raw_sql = generate_gemini_sql(api_key, system_instruction, question)
     except Exception as e:
         logger.error(f"[Gemini API Call Failed]: {e}")
-        # --- SAVED QUERY FALLBACK (Requirement 4) ---
+        # --- SAVED QUERY FALLBACK ---
         fallback_sql = find_saved_query(question)
         if fallback_sql:
             logger.info(f"[Saved Query Fallback] Using pre-verified query for: {question[:80]}")
@@ -613,7 +743,7 @@ async def process_copilot_ask(question: str, role: str) -> Dict[str, Any]:
                 "can_draft_reminders": False,
             }
 
-    # --- REFUSE DETECTION (Requirement 2) ---
+    # --- REFUSE DETECTION ---
     raw_sql_clean = strip_ansi(raw_sql)
     upper_sql = raw_sql_clean.lstrip().upper()
     if not (upper_sql.startswith("SELECT") or upper_sql.startswith("WITH")):
@@ -639,77 +769,158 @@ async def process_copilot_ask(question: str, role: str) -> Dict[str, Any]:
             "can_draft_reminders": False,
         }
 
-    # --- SQLGLOT AST VALIDATION ---
-    try:
-        validated_sql = validate_and_format_sql(raw_sql_clean, role)
-    except SecurityViolation as sv:
-        return {
-            "status": "blocked",
-            "answer": f"This question needs data your role cannot see: {sv.message}",
-            "columns": [],
-            "rows": [],
-            "sql": f"-- BLOCKED: {raw_sql_clean}",
-            "blocked_layer": sv.layer,
-            "blocked_reason": sv.message,
-            "row_count": 0,
-            "duration_ms": int((time.time() - start_time) * 1000),
-            "tables_used": [],
-            "can_draft_reminders": False,
-        }
+    # --- SELF-REPAIR LOOP (Up to 2 repairs within 45s deadline) ---
+    max_repairs = 2
+    current_sql = raw_sql_clean
+    validated_sql = None
+    query_rows = None
+    last_error_msg = None
+    repair_success = False
 
-    # --- EXECUTE VIA RUN_READONLY_QUERY POSTGRES RPC (Item 3) ---
-    sb = get_supabase()
-    if not sb:
-        return {
-            "status": "error",
-            "answer": "Database service unavailable. Please configure Supabase credentials.",
-            "columns": [],
-            "rows": [],
-            "sql": validated_sql,
-            "blocked_layer": "database",
-            "blocked_reason": "Database connection unavailable.",
-            "row_count": 0,
-            "duration_ms": int((time.time() - start_time) * 1000),
-            "tables_used": [],
-            "can_draft_reminders": False,
-        }
-
-    try:
-        rpc_res = sb.rpc("run_readonly_query", {"sql_text": validated_sql}).execute()
-        query_rows = rpc_res.data or []
-    except Exception as e:
-        logger.error(f"[run_readonly_query Execution Error]: {e}")
-        return {
-            "status": "error",
-            "answer": f"Database execution error: {str(e)}",
-            "columns": [],
-            "rows": [],
-            "sql": validated_sql,
-            "blocked_layer": "database",
-            "blocked_reason": str(e),
-            "row_count": 0,
-            "duration_ms": int((time.time() - start_time) * 1000),
-            "tables_used": [],
-            "can_draft_reminders": False,
-        }
-
-    # --- Log saved query to query_logs with flag ---
-    if is_saved_query:
+    for attempt in range(1 + max_repairs):
+        # 1. Validate SQL (syntax, single statement, role tables, blocked columns, non-existent columns)
         try:
-            import uuid
-            sb.table("query_logs").insert({
-                "id": str(uuid.uuid4()),
-                "question": question,
+            validated_sql = validate_and_format_sql(current_sql, role)
+        except SecurityViolation as sv:
+            last_error_msg = sv.message
+            logger.warning(f"[Attempt {attempt + 1}] Validation failed: {sv.message}")
+            _log_query_attempt(
+                sb=sb,
+                question=question,
+                sql_text=current_sql,
+                role=role,
+                status="REPAIR_ATTEMPT" if attempt < max_repairs else "VALIDATION_FAILED",
+                blocked_reason=sv.message,
+                blocked_layer=sv.layer,
+                row_count=0,
+                duration_ms=int((time.time() - start_time) * 1000),
+            )
+            # If forbidden role table or intentional refusal, do not repair if it's an unrepairable role violation
+            # but column/table syntax errors are repairable
+            if attempt < max_repairs and (deadline - time.time()) > 2.0 and not is_saved_query:
+                try:
+                    logger.info(f"Triggering Gemini repair attempt {attempt + 1}/{max_repairs} for validation error: {sv.message}")
+                    repaired_sql = repair_gemini_sql(
+                        api_key=api_key,
+                        role_schema=role_schema,
+                        failed_sql=current_sql,
+                        error_msg=sv.message,
+                        deadline=deadline,
+                    )
+                    current_sql = strip_ansi(repaired_sql)
+                    continue
+                except Exception as repair_exc:
+                    logger.warning(f"Repair call failed: {repair_exc}")
+                    break
+            else:
+                break
+
+        # 2. If validation passed, execute query against database
+        if not sb:
+            return {
+                "status": "error",
+                "answer": "Database service unavailable. Please configure Supabase credentials.",
+                "columns": [],
+                "rows": [],
                 "sql": validated_sql,
-                "role": role,
-                "status": "SAVED_QUERY",
-                "blocked_reason": None,
-                "blocked_layer": None,
-                "row_count": len(query_rows),
+                "blocked_layer": "database",
+                "blocked_reason": "Database connection unavailable.",
+                "row_count": 0,
                 "duration_ms": int((time.time() - start_time) * 1000),
-            }).execute()
-        except Exception as log_err:
-            logger.warning(f"[query_logs saved_query insert error]: {log_err}")
+                "tables_used": [],
+                "can_draft_reminders": False,
+            }
+
+        try:
+            rpc_res = sb.rpc("run_readonly_query", {"sql_text": validated_sql}).execute()
+            query_rows = rpc_res.data or []
+            repair_success = True
+            # Log success (or repaired success)
+            _log_query_attempt(
+                sb=sb,
+                question=question,
+                sql_text=validated_sql,
+                role=role,
+                status="SAVED_QUERY" if is_saved_query else ("REPAIRED" if attempt > 0 else "SUCCESS"),
+                blocked_reason=None,
+                blocked_layer=None,
+                row_count=len(query_rows),
+                duration_ms=int((time.time() - start_time) * 1000),
+            )
+            break
+        except Exception as db_exc:
+            last_error_msg = str(db_exc)
+            logger.warning(f"[Attempt {attempt + 1}] DB execution failed: {db_exc}")
+            _log_query_attempt(
+                sb=sb,
+                question=question,
+                sql_text=validated_sql,
+                role=role,
+                status="REPAIR_ATTEMPT" if attempt < max_repairs else "EXECUTION_FAILED",
+                blocked_reason=str(db_exc),
+                blocked_layer="database",
+                row_count=0,
+                duration_ms=int((time.time() - start_time) * 1000),
+            )
+            if attempt < max_repairs and (deadline - time.time()) > 2.0 and not is_saved_query:
+                try:
+                    logger.info(f"Triggering Gemini repair attempt {attempt + 1}/{max_repairs} for DB error: {db_exc}")
+                    repaired_sql = repair_gemini_sql(
+                        api_key=api_key,
+                        role_schema=role_schema,
+                        failed_sql=validated_sql,
+                        error_msg=str(db_exc),
+                        deadline=deadline,
+                    )
+                    current_sql = strip_ansi(repaired_sql)
+                    continue
+                except Exception as repair_exc:
+                    logger.warning(f"Repair call failed: {repair_exc}")
+                    break
+            else:
+                break
+
+    # If execution failed or validation failed after exhausting repairs
+    if not repair_success:
+        # Check if question matches saved query fallback (Item 4)
+        saved_fallback = find_saved_query(question)
+        if saved_fallback and not is_saved_query:
+            logger.info(f"[Saved Query Fallback] Self-repairs exhausted. Using saved query for: {question[:80]}")
+            try:
+                validated_sql = validate_and_format_sql(saved_fallback, role)
+                rpc_res = sb.rpc("run_readonly_query", {"sql_text": validated_sql}).execute()
+                query_rows = rpc_res.data or []
+                is_saved_query = True
+                _log_query_attempt(
+                    sb=sb,
+                    question=question,
+                    sql_text=validated_sql,
+                    role=role,
+                    status="SAVED_QUERY",
+                    blocked_reason=None,
+                    blocked_layer=None,
+                    row_count=len(query_rows),
+                    duration_ms=int((time.time() - start_time) * 1000),
+                )
+            except Exception as sf_err:
+                logger.error(f"[Saved query execution after repairs failed]: {sf_err}")
+                query_rows = None
+
+        if query_rows is None:
+            # Report failure cleanly
+            return {
+                "status": "error",
+                "answer": f"Database execution error: {last_error_msg or 'Query execution failed after repairs'}",
+                "columns": [],
+                "rows": [],
+                "sql": validated_sql or current_sql,
+                "blocked_layer": "database",
+                "blocked_reason": last_error_msg,
+                "row_count": 0,
+                "duration_ms": int((time.time() - start_time) * 1000),
+                "tables_used": [],
+                "can_draft_reminders": False,
+            }
 
     # --- FORMAT RESULTS & PLAIN-ENGLISH ANSWER (Item 4 & 5) ---
     columns = list(query_rows[0].keys()) if query_rows else []
