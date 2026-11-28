@@ -301,143 +301,79 @@ INSERT INTO public.timetable_sessions (id, batch_id, trainer_id, room_id, weekda
 ('sess_12', 'b_py_b', 'tr_2', NULL, 'Thursday', '14:00', '16:30', 'online', 'bg-emerald-50 border-emerald-200 text-emerald-900'),
 ('sess_13', 'b_java_a', 'tr_1', 'rm_1', 'Friday', '09:00', '11:00', 'classroom', 'bg-indigo-50 border-indigo-200 text-indigo-900'),
 ('sess_14', 'b_py_a', 'tr_2', 'rm_3', 'Friday', '11:30', '13:30', 'classroom', 'bg-emerald-50 border-emerald-200 text-emerald-900'),
-('sess_15', 'b_web_a', 'tr_4', 'rm_1', 'Friday', '14:00', '16:00', 'classroom', 'bg-amber-50 border-amber-200 text-amber-900');
+('sess_15', 'b_web_a', 'tr_4', 'rm_1', 'Friday', '14:00', '16:00', 'classroom', 'bg-amber-50 border-amber-200 text-amber-900'),
+('sess_16', 'b_java_b', 'tr_1', 'rm_2', 'Saturday', '10:00', '12:00', 'hybrid', 'bg-indigo-50 border-indigo-200 text-indigo-900');
 
 -- -------------------------------------------------------------
--- 10. ATTENDANCE RECORDS (Past 30 Days + Today's Started Sessions)
---
--- Rules:
--- 1. Generated deterministically only on scheduled batch weekdays.
--- 2. std_101 (Aarav Sharma): 3 absences in last 30d (at days -5, -12, -19).
--- 3. std_103 (Sneha Patil): 4 absences in last 30d (low attendance ~65%).
--- 4. Manish Choudhury (std_141): 4 absences in last 30d + overdue dues.
--- 5. Today's session attendance:
---    Checked against (now() AT TIME ZONE 'Asia/Kolkata')::time.
---    Sessions starting before current time record attendance; later sessions record none.
+-- 10. ATTENDANCE RECORDS (past 30 days + today's started sessions)
+-- Absences for the benchmark students are tied to their most recent class numbers,
+-- not to fixed calendar dates, so the benchmark works on any weekday.
 -- -------------------------------------------------------------
 INSERT INTO public.attendance_records (id, student_id, batch_id, session_date, status, mode, duration_minutes, verified_by, ip_or_location)
 WITH batch_schedule AS (
     SELECT 'b_java_a' AS b_id, ARRAY['Monday', 'Wednesday', 'Friday'] AS weekdays, 'classroom' AS mode, 120 AS dur
-    UNION ALL SELECT 'b_java_b', ARRAY['Tuesday', 'Thursday', 'Saturday'], 'hybrid', 120
+    UNION ALL SELECT 'b_java_b', ARRAY['Tuesday', 'Thursday', 'Saturday'], 'classroom', 120
     UNION ALL SELECT 'b_py_a', ARRAY['Monday', 'Wednesday', 'Friday'], 'classroom', 120
     UNION ALL SELECT 'b_py_b', ARRAY['Tuesday', 'Thursday'], 'online', 150
-    UNION ALL SELECT 'b_ds_a', ARRAY['Monday', 'Wednesday'], 'hybrid', 150
+    UNION ALL SELECT 'b_ds_a', ARRAY['Monday', 'Wednesday'], 'classroom', 150
     UNION ALL SELECT 'b_web_a', ARRAY['Monday', 'Wednesday', 'Friday'], 'classroom', 120
 ),
 past_session_dates AS (
-    SELECT
-        bs.b_id,
-        bs.mode,
-        bs.dur,
-        d.dt::date AS s_date
+    SELECT bs.b_id, bs.mode, bs.dur, d.dt::date AS s_date
     FROM batch_schedule bs
     CROSS JOIN generate_series((CURRENT_DATE - INTERVAL '30 days')::date, (CURRENT_DATE - INTERVAL '1 day')::date, INTERVAL '1 day') AS d(dt)
     WHERE TRIM(TO_CHAR(d.dt::date, 'Day')) = ANY(bs.weekdays)
 ),
 all_student_past_sessions AS (
-    SELECT
-        s.id AS student_id,
-        s.batch_id,
-        sd.s_date,
-        sd.mode,
-        sd.dur,
+    SELECT s.id AS student_id, s.batch_id, sd.s_date, sd.mode, sd.dur,
         ('att_' || s.id || '_' || TO_CHAR(sd.s_date, 'YYYYMMDD')) AS att_id,
-        (('x' || SUBSTRING(MD5(s.id || '_' || sd.s_date::text), 1, 8))::bit(32)::bigint % 100) AS h_val
+        (('x' || SUBSTRING(MD5(s.id || '_' || sd.s_date::text), 1, 8))::bit(32)::bigint % 100) AS h_val,
+        ROW_NUMBER() OVER (PARTITION BY s.id ORDER BY sd.s_date DESC) AS rn
     FROM public.students s
     JOIN past_session_dates sd ON s.batch_id = sd.b_id
-    WHERE s.status IN ('active', 'on_leave', 'dropped')
-      AND sd.s_date >= s.enrollment_date
+    WHERE s.status IN ('active', 'on_leave', 'dropped') AND sd.s_date >= s.enrollment_date
+),
+with_status AS (
+    SELECT *,
+        CASE
+            WHEN student_id = 'std_101' THEN CASE WHEN rn IN (2, 5, 8) THEN 'absent' ELSE 'present' END
+            WHEN student_id = 'std_103' THEN CASE WHEN rn IN (2, 4, 6, 9) THEN 'absent' WHEN h_val < 20 THEN 'late' ELSE 'present' END
+            WHEN student_id = 'std_141' THEN CASE WHEN rn IN (3, 5, 8, 10) THEN 'absent' ELSE 'present' END
+            WHEN student_id IN ('std_109', 'std_116') THEN 'absent'
+            WHEN h_val < 7 THEN 'absent'
+            WHEN h_val < 15 THEN 'late'
+            ELSE 'present'
+        END AS status
+    FROM all_student_past_sessions
 )
-SELECT
-    att_id,
-    student_id,
-    batch_id,
-    s_date,
-    CASE
-        -- Aarav Sharma: exactly 3 absences in the past 30 days
-        WHEN student_id = 'std_101' THEN
-            CASE
-                WHEN s_date IN (
-                    (CURRENT_DATE - INTERVAL '5 days')::date,
-                    (CURRENT_DATE - INTERVAL '12 days')::date,
-                    (CURRENT_DATE - INTERVAL '19 days')::date
-                ) THEN 'absent'
-                ELSE 'present'
-            END
-        -- Sneha Patil: low attendance ~65%, 4 absences
-        WHEN student_id = 'std_103' THEN
-            CASE
-                WHEN s_date IN (
-                    (CURRENT_DATE - INTERVAL '5 days')::date,
-                    (CURRENT_DATE - INTERVAL '12 days')::date,
-                    (CURRENT_DATE - INTERVAL '19 days')::date,
-                    (CURRENT_DATE - INTERVAL '26 days')::date
-                ) THEN 'absent'
-                WHEN h_val < 20 THEN 'late'
-                ELSE 'present'
-            END
-        -- Manish Choudhury: 4 absences
-        WHEN student_id = 'std_141' THEN
-            CASE
-                WHEN s_date IN (
-                    (CURRENT_DATE - INTERVAL '7 days')::date,
-                    (CURRENT_DATE - INTERVAL '14 days')::date,
-                    (CURRENT_DATE - INTERVAL '21 days')::date,
-                    (CURRENT_DATE - INTERVAL '28 days')::date
-                ) THEN 'absent'
-                ELSE 'present'
-            END
-        -- Dropped students: absent
-        WHEN student_id IN ('std_109', 'std_116') THEN 'absent'
-        -- General population distribution: ~85% present, ~8% late, ~7% absent
-        WHEN h_val < 7 THEN 'absent'
-        WHEN h_val < 15 THEN 'late'
-        ELSE 'present'
-    END AS status,
-    mode,
-    CASE
-        WHEN student_id = 'std_101' AND s_date IN ((CURRENT_DATE - INTERVAL '5 days')::date, (CURRENT_DATE - INTERVAL '12 days')::date, (CURRENT_DATE - INTERVAL '19 days')::date) THEN 0
-        WHEN student_id = 'std_103' AND s_date IN ((CURRENT_DATE - INTERVAL '5 days')::date, (CURRENT_DATE - INTERVAL '12 days')::date, (CURRENT_DATE - INTERVAL '19 days')::date, (CURRENT_DATE - INTERVAL '26 days')::date) THEN 0
-        WHEN student_id = 'std_141' AND s_date IN ((CURRENT_DATE - INTERVAL '7 days')::date, (CURRENT_DATE - INTERVAL '14 days')::date, (CURRENT_DATE - INTERVAL '21 days')::date, (CURRENT_DATE - INTERVAL '28 days')::date) THEN 0
-        WHEN student_id IN ('std_109', 'std_116') THEN 0
-        WHEN h_val < 7 THEN 0
-        WHEN h_val < 15 THEN dur - 15
-        ELSE dur
-    END AS duration_minutes,
+SELECT att_id, student_id, batch_id, s_date, status, mode,
+    CASE status WHEN 'absent' THEN 0 WHEN 'late' THEN dur - 15 ELSE dur END AS duration_minutes,
     CASE WHEN mode = 'online' THEN 'Zoom WebRTC Hook' ELSE 'Front Desk Biometrics' END AS verified_by,
     CASE WHEN mode = 'online' THEN 'IP 103.21.' || ((h_val % 70) + 10)::text || '.88' ELSE 'Turnstile RFID' END AS ip_or_location
-FROM all_student_past_sessions;
+FROM with_status;
 
--- -------------------------------------------------------------
--- 10.1 TODAY'S SESSIONS ATTENDANCE (Started sessions only)
--- -------------------------------------------------------------
+-- ---------------- PART 1B: today's sessions that have already started ----------------
+-- You can run just this statement again later in the day (for example just before
+-- your presentation): it adds attendance for any session that has started since,
+-- and skips rows that already exist.
 INSERT INTO public.attendance_records (id, student_id, batch_id, session_date, status, mode, duration_minutes, verified_by, ip_or_location)
 WITH todays_started_sessions AS (
-    SELECT
-        ts.batch_id,
-        ts.mode,
-        ROUND(EXTRACT(EPOCH FROM (ts.end_time - ts.start_time)) / 60.0)::int AS dur
+    SELECT ts.batch_id,
+           CASE WHEN ts.mode = 'online' THEN 'online' ELSE 'classroom' END AS mode,
+           ROUND(EXTRACT(EPOCH FROM (ts.end_time - ts.start_time)) / 60.0)::int AS dur
     FROM public.timetable_sessions ts
     WHERE ts.weekday = TRIM(TO_CHAR((now() AT TIME ZONE 'Asia/Kolkata')::date, 'Day'))
       AND ts.start_time <= (now() AT TIME ZONE 'Asia/Kolkata')::time
 ),
 todays_students AS (
-    SELECT
-        s.id AS student_id,
-        s.batch_id,
-        tss.mode,
-        tss.dur,
+    SELECT s.id AS student_id, s.batch_id, tss.mode, tss.dur,
         ('att_' || s.id || '_' || TO_CHAR((now() AT TIME ZONE 'Asia/Kolkata')::date, 'YYYYMMDD')) AS att_id,
         (('x' || SUBSTRING(MD5(s.id || '_today'), 1, 8))::bit(32)::bigint % 100) AS h_val
     FROM public.students s
     JOIN todays_started_sessions tss ON s.batch_id = tss.batch_id
     WHERE s.status = 'active'
 )
-SELECT
-    att_id,
-    student_id,
-    batch_id,
-    (now() AT TIME ZONE 'Asia/Kolkata')::date AS session_date,
+SELECT att_id, student_id, batch_id, (now() AT TIME ZONE 'Asia/Kolkata')::date AS session_date,
     CASE WHEN h_val < 8 THEN 'absent' WHEN h_val < 16 THEN 'late' ELSE 'present' END AS status,
     mode,
     CASE WHEN h_val < 8 THEN 0 WHEN h_val < 16 THEN dur - 15 ELSE dur END AS duration_minutes,
@@ -445,6 +381,7 @@ SELECT
     CASE WHEN mode = 'online' THEN 'IP 103.21.44.12' ELSE 'Turnstile RFID Door 1' END AS ip_or_location
 FROM todays_students
 ON CONFLICT (id) DO NOTHING;
+
 
 -- -------------------------------------------------------------
 -- 11. ACTION ITEMS (Staged and sent reminder queue)
@@ -485,6 +422,42 @@ INSERT INTO public.class_recordings (id, batch_id, topic, recording_date, durati
 
 ('rec_08', 'b_web_a', 'Docker Networking, Volumes & Multi-Stage Production Builds', (CURRENT_DATE - INTERVAL '5 days'), 110, 'Lab 1 Recording Rig', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', 'https://images.unsplash.com/photo-1605379399642-870262d3d051?w=480&auto=format&fit=crop&q=80', 22, '[{"time":"00:00","label":"Bridge vs Host Networks"},{"time":"40:00","label":"Multi-Stage Alpine Builds"}]'::jsonb),
 ('rec_09', 'b_web_a', 'Next.js 15 App Router: Server Actions, Suspense & Streaming SSR', (CURRENT_DATE - INTERVAL '7 days'), 115, 'Lab 1 Recording Rig', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=480&auto=format&fit=crop&q=80', 31, '[{"time":"00:00","label":"Server Component Boundaries"},{"time":"46:30","label":"Optimistic UI Mutations"}]'::jsonb);
+
+-- -------------------------------------------------------------
+-- 14b. NAMES AND PHONE NUMBERS CLEAN-UP
+-- -------------------------------------------------------------
+-- ---------------- PART 2A: replace names of well-known real people ----------------
+UPDATE public.students AS s
+SET name = v.new_name,
+    email = lower(replace(v.new_name, ' ', '.')) || '@apextech.example.in'
+FROM (VALUES
+    ('std_118', 'Manoj Srivastava'),
+    ('std_119', 'Saurabh Chatterjee'),
+    ('std_127', 'Rahul Shenoy'),
+    ('std_128', 'Jasdeep Grewal'),
+    ('std_136', 'Shreya Bhowmick'),
+    ('std_138', 'Devendra Kamat'),
+    ('std_143', 'Gautam Soman'),
+    ('std_150', 'Anuradha Mishra'),
+    ('std_151', 'Varun Tandon'),
+    ('std_152', 'Aditya Rao Kamath'),
+    ('std_153', 'Kriti Wadhwa'),
+    ('std_154', 'Ayush Khanduri'),
+    ('std_155', 'Radhika Iyengar'),
+    ('std_157', 'Amrita Dutta'),
+    ('std_158', 'Jaspreet Randhawa'),
+    ('std_162', 'Suraj Pathak')
+) AS v(id, new_name)
+WHERE s.id = v.id;
+
+UPDATE public.trainers
+SET name = 'Kavita Rangan', email = 'kavita.rangan@apextech.example.in'
+WHERE id = 'tr_6';
+
+-- ---------------- PART 2B: varied phone numbers (deterministic, no patterns) ----------------
+UPDATE public.students
+SET phone = ((6 + abs(hashtext(id)) % 4)::text) || lpad((abs(hashtext(id || '_ph')) % 1000000000)::text, 9, '0');
+
 
 -- ====================================================================
 -- 15. VERIFICATION BLOCK (Row counts & benchmark query verification)
